@@ -7,7 +7,9 @@ if (window.ytCommentsAnalyzerInitialized) {
     window.ytCommentsAnalyzerInitialized = true;
     console.log("YouTube 댓글 분석기: content_script.js 로드 및 초기화 시작.");
 
-    const SERVER_URL = "https://c8b6-34-125-166-27.ngrok-free.app/analyze"; // 서버 URL (ngrok 또는 실제 서버)
+    const SERVER_URL = "https://ad80-34-169-147-13.ngrok-free.app"; // 서버 URL (ngrok 또는 실제 서버)
+    const SERVER_ANALYZE_URL = SERVER_URL + "/analyze";
+    const SERVER_REPORT_WORD_URL = SERVER_URL + "/report_word";
     const COMMENTS_SECTION_SELECTOR = "ytd-comments#comments"; // 댓글 섹션 전체
     const COMMENT_WRAPPER_SELECTOR = "ytd-comment-thread-renderer, ytd-comment-view-model[is-reply]";
     const CONTENT_WRAPPER_SELECTOR = "#content-text";
@@ -136,7 +138,7 @@ if (window.ytCommentsAnalyzerInitialized) {
     function sendCommentToServer(commentTask) {
         console.log(`YouTube 댓글 분석기: 🚀 서버로 댓글 전송 시도 (ID: ${commentTask.id.slice(0, 50)}...)`);
 
-        fetch(SERVER_URL, {
+        fetch(SERVER_ANALYZE_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ comments: [{ id: commentTask.id, text: commentTask.text, videoId: commentTask.videoId }] }),
@@ -558,12 +560,42 @@ if (window.ytCommentsAnalyzerInitialized) {
 
 
         // 새 버튼에 클릭 이벤트 리스너 추가
-        newButton.addEventListener('click', (event) => {
-            event.stopPropagation(); // 이벤트 버블링 방지
-            event.preventDefault();  // 기본 동작 방지
-            console.log('YouTube 댓글 분석기: 커스텀 액션 버튼 클릭됨!', commentElement);
-            // 여기에 버튼 클릭 시 수행할 작업 추가 (예: alert, 특정 함수 호출 등)
-            alert(`댓글 내용:\n${commentElement.querySelector(CONTENT_WRAPPER_SELECTOR)?.textContent?.trim()}\n\n분석기 작업 버튼이 클릭되었습니다.`);
+        newButton.addEventListener('click', async (event) => {
+            event.stopPropagation();
+            event.preventDefault();
+
+            const commentText = commentElement.querySelector(CONTENT_WRAPPER_SELECTOR)?.textContent?.trim();
+
+            const wordToReport = prompt("신고할 단어를 입력하세요:");
+            if (!wordToReport) return;
+
+            const reason = prompt("신고 사유를 입력하세요:");
+            if (!reason) return;
+
+
+            try {
+                const response = await fetch(SERVER_REPORT_WORD_URL, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        word: wordToReport,
+                        reason: reason,
+                        context: commentText // optional: 댓글 원문도 같이 보내기
+                    })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    alert("신고가 접수되었습니다!");
+                } else {
+                    alert("서버 응답 오류!");
+                }
+            } catch (err) {
+                console.error("Fetch error:", err);
+                alert("서버에 연결할 수 없습니다.");
+            }
         });
 
         // 완성된 새 버튼을 새 메뉴 렌더러에 추가
