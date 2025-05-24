@@ -28,7 +28,7 @@ os.environ["NGROK_AUTH_TOKEN"] = "2B..."  # ngrok 토큰
 os.environ["OPENAI_API_KEY"] = "sk-..."   # OpenAI API 키
 ```
 
-## 🧠 기능 요약
+### 🧠 서버 기능 요약
 
 ✅ KoELECTRA 기반 멀티레이블 혐오 탐지 (8개 범주)
 
@@ -40,7 +40,7 @@ os.environ["OPENAI_API_KEY"] = "sk-..."   # OpenAI API 키
 
 ✅ Flask API로 /analyze, /report_word 제공
 
-## 📂 폴더 구조
+### 📂 폴더 구조
 
 ```bash
 hatedog/
@@ -72,12 +72,12 @@ MZ세대 혐오 표현/정상 표현 예시가 담겨 있으며,
 
 📝 사용자가 직접 내용 추가/수정 후 재시작하면 탐지기의 인식 범위를 확장할 수 있습니다.
 
-## 🌐 Chrome 확장 기능 (📁 `chrome-extension/`)
+---
+
+## 🌐 Chrome 확장 (📁 `chrome-extension/`)
 
 이 프로젝트에는 YouTube 댓글을 실시간으로 감지하여  
 **KoELECTRA + GPT 기반 서버에 전송하고 결과를 UI에 반영하는 크롬 확장**이 포함됩니다.
-
----
 
 ### ⚙️ 주요 구성 요소
 
@@ -88,7 +88,6 @@ MZ세대 혐오 표현/정상 표현 예시가 담겨 있으며,
 | `manifest.json`     | 확장 프로그램 정의 (V3, 서비스 워커 기반) |
 | `icon.png`          | 확장 아이콘 |
 
----
 
 ### 🔍 작동 방식
 
@@ -96,8 +95,6 @@ MZ세대 혐오 표현/정상 표현 예시가 담겨 있으며,
 2. **댓글이 새로 로딩되면 자동으로 서버에 전송**
 3. **혐오 표현이면 "검열됨", 아니면 원문 유지**
 4. 각 댓글 옆 메뉴에 **느낌표 버튼**이 추가됨 → 직접 단어를 신고 가능
-
----
 
 ### 🔐 서버와의 통신
 
@@ -111,7 +108,7 @@ const SERVER_URL = "https://your-ngrok-url.ngrok-free.app"; // 반드시 실제 
 ⚠️ Colab에서 ngrok로 서버 실행 시, 매번 새 주소가 생성되므로 SERVER_URL은 수시로 갱신 필요
 ```
 
-## 🧪 설치 방법 (Chrome 확장)
+### 🧪 설치 방법 (Chrome 확장)
 
 1. Chrome 브라우저에서 `chrome://extensions` 접속
 2. 우측 상단 "개발자 모드" 활성화
@@ -119,15 +116,8 @@ const SERVER_URL = "https://your-ngrok-url.ngrok-free.app"; // 반드시 실제 
 4. `chrome-extension/` 폴더 선택
 5. YouTube 영상 페이지로 이동 → 댓글 분석이 자동으로 동작하는지 확인
 
-## 📎 예시 동작 화면
+### 📎 예시 동작 화면
 댓글이 "검열됨"으로 바뀌거나
 
 UI 오른쪽 메뉴에 노란색 느낌표 아이콘(신고 버튼)이 추가됨
 
-
-## 🔐 민감 정보 관리
-.env 파일은 사용하지 않습니다.
-
-Hugging Face, OpenAI, ngrok 토큰은 Colab 노트북 상단에서 직접 os.environ으로 설정해야 합니다.
-
-토큰 정보는 GitHub에 커밋되지 않으며 외부 노출되지 않습니다.
