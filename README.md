@@ -1,4 +1,4 @@
-# 🐶 HATEDOG: MLM+LLM+RAG 기반 혐오 표현 탐지기
+# 🐶 HATEDOG: AI 기반 유튜브 댓글 혐오 표현 탐지기
 
 한국어 댓글을 입력하면 **KoELECTRA + OpenAI GPT + LangChain + RAG**을 이용해  
 혐오 여부와 그 판단 근거를 함께 반환하는 API 서버입니다.  
