@@ -8,7 +8,7 @@
 
 ## 🚀 Colab에서 바로 실행하기
 
-📎 [Colab에서 실행](https://drive.google.com/file/d/1O0134EY940GTPnbr8h4Ci3wVzvGHeNNG/view?usp=sharing)
+📎 [Colab에서 실행](https://colab.research.google.com/github/ye422/hatedog/blob/main/run.ipynb)
 
 > 이 노트북은 다음을 자동으로 수행합니다:
 > - GitHub 레포지토리 클론
