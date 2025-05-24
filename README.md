@@ -42,7 +42,7 @@ os.environ["OPENAI_API_KEY"] = "sk-..."   # OpenAI API 키
 
 ## 📂 폴더 구조
 
-```python
+```bash
 hatedog/
 ├── chrome-extension/       # 크롬 확장 코드
 ├── llm_server/             # Flask 서버 및 분석 로직
@@ -58,12 +58,12 @@ hatedog/
 
 ### 🔍 mz_hate_speech.csv: 신조어 기반 RAG 확장
 
-llm_server/data/mz_hate_speech.csv에는
+`llm_server/data/mz_hate_speech.csv`에는
 MZ세대 혐오 표현/정상 표현 예시가 담겨 있으며,
 초기 실행 시 자동으로 벡터스토어에 임베딩되어 RAG 기반 프롬프트에 활용됩니다.
 
 ### CSV 포맷 예시:
-```python
+```csv
 범주,예시표현,간략 정의/맥락,label
 인종,화짱조,"화교, 짱깨, 조선족의 줄임말로, 중국계 사람에 대한 인종차별 표현",혐오 발언
 ```
@@ -106,21 +106,18 @@ MZ세대 혐오 표현/정상 표현 예시가 담겨 있으며,
 
 서버 주소(`SERVER_URL`)는 `content_script.js` 내 상단에서 수동 설정해야 합니다:
 
-```js
+```javascript
 const SERVER_URL = "https://your-ngrok-url.ngrok-free.app"; // 반드시 실제 ngrok 주소로 변경
 ⚠️ Colab에서 ngrok로 서버 실행 시, 매번 새 주소가 생성되므로 SERVER_URL은 수시로 갱신 필요
 ```
 
-## 🧪 설치 방법
-Chrome 브라우저에서 chrome://extensions로 이동
+## 🧪 설치 방법 (Chrome 확장)
 
-우측 상단 개발자 모드 활성화
-
-압축해제된 확장 프로그램 로드 클릭
-
-chrome-extension/ 폴더 선택
-
-YouTube 영상 페이지로 이동 → 댓글이 자동 분석되는지 확인
+1. Chrome 브라우저에서 `chrome://extensions` 접속
+2. 우측 상단 "개발자 모드" 활성화
+3. "압축해제된 확장 프로그램 로드" 클릭
+4. `chrome-extension/` 폴더 선택
+5. YouTube 영상 페이지로 이동 → 댓글 분석이 자동으로 동작하는지 확인
 
 ## 📎 예시 동작 화면
 댓글이 "검열됨"으로 바뀌거나
