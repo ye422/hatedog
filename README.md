@@ -101,7 +101,7 @@ MZ세대 혐오 표현/정상 표현 예시가 담겨 있으며,
 - 분석 요청: `POST /analyze`
 - 단어 신고: `POST /report_word`
 
-서버 주소(`SERVER_URL`)는 `content_script.js` 내 상단에서 수동 설정해야 합니다:
+서버 주소(`SERVER_URL`)는 `content_script.js` 내 상단에서 수동 설정해야 합니다.
 
 ```javascript
 const SERVER_URL = "https://your-ngrok-url.ngrok-free.app"; // 반드시 실제 ngrok 주소로 변경
