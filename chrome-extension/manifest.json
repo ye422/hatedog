@@ -1,0 +1,25 @@
+{
+    "manifest_version": 3,
+    "name": "YouTube 댓글 분석기",
+    "version": "1",
+    "description": "YouTube 댓글을 수집/분석하고 결과를 반영합니다.",
+    "permissions": [
+        "storage",
+        "scripting"
+    ],
+    "host_permissions": [
+        "*://*.youtube.com/*",
+        "http://127.0.0.1:5000/*",
+        "서버 URL로 변경 필요!!/*"
+    ],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "action": {
+        "default_icon": "icon.png",
+        "default_title": "댓글 분석기 상태"
+    },
+    "icons": {
+        "48": "icon.png"
+    }
+}
