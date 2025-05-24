@@ -49,6 +49,7 @@ hatedog/
 │   ├── app.py
 │   ├── config.py
 │   ├── llm_analyzer.py
+│   ├── db.py
 │   ├── data/
 │   │   └── mz_hate_speech.csv  # ✅ 기본 예시 포함 (수정 가능)
 │   └── ...
