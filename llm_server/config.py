@@ -57,3 +57,6 @@ INCLUDE_KOELECTRA_KEY: str = 'include_koelectra'
 
 # --- Device ---
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+# --- Port Configuration ---
+PORT: int = int(os.getenv('PORT', 5000)) # Default to 5000 if not set
