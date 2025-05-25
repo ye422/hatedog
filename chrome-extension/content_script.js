@@ -7,7 +7,7 @@ if (window.ytCommentsAnalyzerInitialized) {
     window.ytCommentsAnalyzerInitialized = true;
     console.log("YouTube 댓글 분석기: content_script.js 로드 및 초기화 시작.");
 
-    const SERVER_URL = "https://ad80-34-169-147-13.ngrok-free.app"; // 서버 URL (ngrok 또는 실제 서버)
+    const SERVER_URL = "https://762a-34-125-183-133.ngrok-free.app"; // 서버 URL (ngrok 또는 실제 서버)
     const SERVER_ANALYZE_URL = SERVER_URL + "/analyze";
     const SERVER_REPORT_WORD_URL = SERVER_URL + "/report_word";
     const COMMENTS_SECTION_SELECTOR = "ytd-comments#comments"; // 댓글 섹션 전체
