@@ -7,6 +7,7 @@ if (window.ytCommentsAnalyzerInitialized) {
     window.ytCommentsAnalyzerInitialized = true;
     console.log("YouTube 댓글 분석기: content_script.js 로드 및 초기화 시작.");
 
+
     const SERVER_URL = "your_server_url"; // 실제 서버 URL로 변경 필요
     const SERVER_ANALYZE_URL = SERVER_URL + "/analyze";
     const SERVER_REPORT_WORD_URL = SERVER_URL + "/report_word";
