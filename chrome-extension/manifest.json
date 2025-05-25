@@ -10,7 +10,7 @@
     "host_permissions": [
         "*://*.youtube.com/*",
         "http://127.0.0.1:5000/*",
-        "서버 URL로 변경 필요!!/*"
+        "https://a1c1-35-237-127-105.ngrok-free.app/*"
     ],
     "background": {
         "service_worker": "background.js"
