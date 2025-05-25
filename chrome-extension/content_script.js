@@ -7,7 +7,7 @@ if (window.ytCommentsAnalyzerInitialized) {
     window.ytCommentsAnalyzerInitialized = true;
     console.log("YouTube 댓글 분석기: content_script.js 로드 및 초기화 시작.");
 
-    const SERVER_URL = "https://ad80-34-169-147-13.ngrok-free.app"; // 서버 URL (ngrok 또는 실제 서버)
+    const SERVER_URL = "your_server_url"; // 실제 서버 URL로 변경 필요
     const SERVER_ANALYZE_URL = SERVER_URL + "/analyze";
     const SERVER_REPORT_WORD_URL = SERVER_URL + "/report_word";
     const COMMENTS_SECTION_SELECTOR = "ytd-comments#comments"; // 댓글 섹션 전체
@@ -15,7 +15,7 @@ if (window.ytCommentsAnalyzerInitialized) {
     const CONTENT_WRAPPER_SELECTOR = "#content-text";
     const TEXT_SPAN_SELECTOR = "span.yt-core-attributed-string"; // 실제 텍스트가 표시되는 span
 
-    // currentCommentsData: key: contentId, value: { originalTextSnapshot, processed, sending, uiState, classification }
+    // currentCommentsData: key: contentId, value: { originalTextSnapshot, processed, sending, uiState, classification, userOverridden }
     let currentCommentsData = {};
     let processingXHR = false; // 한 번에 하나의 서버 요청만 처리하기 위한 플래그
     let commentObserver = null;
@@ -36,13 +36,12 @@ if (window.ytCommentsAnalyzerInitialized) {
     const CLASS_PROCESSED_NORMAL = "yt-comment-analyzer-processed-normal";
     const VISUAL_INDICATOR_CLASS = "yt-comment-analyzer-indicator";
     const HIDDEN_ORIGINAL_SPAN_CLASS = "yt-analyzer-hidden-original-text";
+    const VIEW_ORIGINAL_BUTTON_CLASS = "yt-analyzer-view-original-button"; // NEW CLASS
 
     // 느낌표 추가
     // --- 상태 및 UI 관련 클래스 (버튼 관련) ---
     const CUSTOM_ACTION_BUTTON_CLASS = 'yt-analyzer-custom-action-button';
     const CUSTOM_MENU_RENDERER_CLASS = 'yt-analyzer-custom-menu-renderer';
-
-
 
     const DEBOUNCE_DELAY = 100;
 
@@ -51,47 +50,27 @@ if (window.ytCommentsAnalyzerInitialized) {
         return urlParams.get('v') || 'unknown_video_id';
     }
 
-    function getCommentId(el, forInitialScan = false) {
-        const contentWrapper = el.querySelector(CONTENT_WRAPPER_SELECTOR);
-        if (contentWrapper) {
-            let textForId = "";
-            const tempTextCheck = contentWrapper.textContent?.trim();
-
-            if (!forInitialScan) { // UI 업데이트 후 ID 재생성 시도 시
-                const hiddenSpan = contentWrapper.querySelector(`.${HIDDEN_ORIGINAL_SPAN_CLASS}`);
-                if (hiddenSpan) {
-                    textForId = hiddenSpan.textContent?.trim();
-                } else if (tempTextCheck !== CHECKING_TEXT && tempTextCheck !== CENSORED_TEXT) {
-                    textForId = tempTextCheck;
-                } else {
-                    return null;
-                }
-            } else { // 초기 스캔 시 (UI 변경 전)
-                if (tempTextCheck === CHECKING_TEXT || tempTextCheck === CENSORED_TEXT) {
-                    return null;
-                }
-                textForId = tempTextCheck;
-            }
-
-            if (!textForId) return null;
-
-            const shortText = textForId.slice(0, 30).replace(/\s+/g, "");
-            return `pseudo--${getVideoId()}--${shortText}`;
-        }
-        return null;
+    // Simplified getCommentId - relies on originalTextForId being passed if known,
+    // otherwise tries to derive it.
+    function generateCommentId(originalText) {
+        if (!originalText) return null;
+        const shortText = originalText.slice(0, 30).replace(/\s+/g, "");
+        return `pseudo--${getVideoId()}--${shortText}`;
     }
 
-    function getCommentIdFromHiddenSpan(el) {
+
+    function getOriginalTextFromElement(el) {
+        if (el.dataset.originalContentAnalyzer) {
+            return el.dataset.originalContentAnalyzer;
+        }
+        const hiddenSpan = el.querySelector(`.${HIDDEN_ORIGINAL_SPAN_CLASS}`);
+        if (hiddenSpan && hiddenSpan.textContent) {
+            return hiddenSpan.textContent.trim();
+        }
         const contentWrapper = el.querySelector(CONTENT_WRAPPER_SELECTOR);
-        if (contentWrapper) {
-            const hiddenSpan = contentWrapper.querySelector(`.${HIDDEN_ORIGINAL_SPAN_CLASS}`);
-            if (hiddenSpan && hiddenSpan.textContent) {
-                const originalText = hiddenSpan.textContent.trim();
-                if (originalText) {
-                    const shortText = originalText.slice(0, 30).replace(/\s+/g, "");
-                    return `pseudo--${getVideoId()}--${shortText}`;
-                }
-            }
+        const currentVisibleText = contentWrapper?.textContent?.trim();
+        if (currentVisibleText && currentVisibleText !== CHECKING_TEXT && currentVisibleText !== CENSORED_TEXT) {
+            return currentVisibleText;
         }
         return null;
     }
@@ -100,7 +79,8 @@ if (window.ytCommentsAnalyzerInitialized) {
     function setElementUIToChecking(element, originalTextContent) {
         const textElement = element.querySelector(CONTENT_WRAPPER_SELECTOR) || element.querySelector(TEXT_SPAN_SELECTOR);
         if (textElement) {
-            if (!element.dataset.originalContentAnalyzer) {
+            // Store original content if not already stored or if different
+            if (!element.dataset.originalContentAnalyzer || element.dataset.originalContentAnalyzer !== originalTextContent) {
                 element.dataset.originalContentAnalyzer = originalTextContent;
             }
             textElement.innerHTML = `${CHECKING_TEXT}<span class="${HIDDEN_ORIGINAL_SPAN_CLASS}" style="display: none;">${originalTextContent}</span>`;
@@ -108,13 +88,17 @@ if (window.ytCommentsAnalyzerInitialized) {
         element.classList.add(CLASS_CHECKING);
         element.classList.remove(CLASS_PROCESSED_NORMAL, CLASS_FILTERED_HATE);
         element.dataset.analyzerState = 'checking';
+
+        // Remove view original button if present
+        const viewButton = textElement.querySelector(`.${VIEW_ORIGINAL_BUTTON_CLASS}`);
+        if (viewButton) viewButton.remove();
     }
 
-    function restoreElementUIToNormal(element) {
+    function restoreElementUIToNormal(element, fromUserAction = false) {
         const originalTextContent = element.dataset.originalContentAnalyzer || "";
         const textElement = element.querySelector(CONTENT_WRAPPER_SELECTOR) || element.querySelector(TEXT_SPAN_SELECTOR);
         if (textElement) {
-            textElement.textContent = originalTextContent;
+            textElement.textContent = originalTextContent; // Just restore text, no hidden span needed here
         }
         element.classList.remove(CLASS_CHECKING, CLASS_FILTERED_HATE);
         element.classList.add(CLASS_PROCESSED_NORMAL);
@@ -122,16 +106,62 @@ if (window.ytCommentsAnalyzerInitialized) {
 
         const indicator = element.querySelector(`.${VISUAL_INDICATOR_CLASS}`);
         if (indicator) indicator.remove();
+
+        // Remove view original button if present
+        const viewButton = textElement && textElement.querySelector(`.${VIEW_ORIGINAL_BUTTON_CLASS}`);
+        if (viewButton) viewButton.remove();
+
+        if (fromUserAction) {
+            const originalTextForId = getOriginalTextFromElement(element);
+            const contentId = generateCommentId(originalTextForId);
+            if (contentId && currentCommentsData[contentId]) {
+                currentCommentsData[contentId].userOverridden = true;
+                currentCommentsData[contentId].uiState = 'user_restored';
+                console.log(`YouTube 댓글 분석기: 사용자가 복원 (ID: ${contentId.slice(0, 50)})`);
+            }
+        }
     }
 
     function setElementUIToCensored(element) {
         const textElement = element.querySelector(CONTENT_WRAPPER_SELECTOR) || element.querySelector(TEXT_SPAN_SELECTOR);
+        const originalTextForId = getOriginalTextFromElement(element); // Get original text for ID
+        const contentId = generateCommentId(originalTextForId);
+
         if (textElement) {
-            textElement.textContent = CENSORED_TEXT;
+            // Ensure original text is in dataset if not already
+            if (!element.dataset.originalContentAnalyzer && originalTextForId) {
+                element.dataset.originalContentAnalyzer = originalTextForId;
+            }
+
+            textElement.textContent = CENSORED_TEXT + " "; // Add space for the button
+
+            // Add "보기" button if it doesn't exist
+            if (!textElement.querySelector(`.${VIEW_ORIGINAL_BUTTON_CLASS}`)) {
+                const viewButton = document.createElement('span');
+                viewButton.textContent = "[보기]";
+                viewButton.className = VIEW_ORIGINAL_BUTTON_CLASS;
+                viewButton.style.cursor = "pointer";
+                viewButton.style.marginLeft = "5px";
+                viewButton.style.textDecoration = "underline";
+                viewButton.style.color = "var(--yt-spec-text-secondary)"; // Use YouTube's secondary text color
+
+                viewButton.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    console.log("YouTube 댓글 분석기: '보기' 버튼 클릭됨", element);
+                    restoreElementUIToNormal(element, true); // Pass true for userAction
+                    // The button is removed by restoreElementUIToNormal
+                });
+                textElement.appendChild(viewButton);
+            }
         }
         element.classList.remove(CLASS_CHECKING, CLASS_PROCESSED_NORMAL);
         element.classList.add(CLASS_FILTERED_HATE);
         element.dataset.analyzerState = 'processed_hate';
+
+        if (contentId && currentCommentsData[contentId]) {
+            currentCommentsData[contentId].userOverridden = false; // Explicitly set to false when censored
+        }
     }
 
 
@@ -153,13 +183,15 @@ if (window.ytCommentsAnalyzerInitialized) {
                 console.log("YouTube 댓글 분석기: ✅ 서버 응답 받음:", data);
                 if (data && data.comments && data.comments.length > 0) {
                     const result = data.comments[0];
-                    applyCensorshipToMatchingElements(result.id, result.classification, result.reason);
+                    // Update currentCommentsData first
                     if (currentCommentsData[result.id]) {
                         currentCommentsData[result.id].processed = true;
                         currentCommentsData[result.id].sending = false;
                         currentCommentsData[result.id].classification = result.classification;
                         currentCommentsData[result.id].uiState = 'processed';
+                        // userOverridden is handled by UI functions
                     }
+                    applyCensorshipToMatchingElements(result.id, result.classification, result.reason);
                 } else {
                     console.warn("YouTube 댓글 분석기: 서버 응답 형식이 잘못됨.", data);
                     restoreAllMatchingElementsToNormalOnError(commentTask.id);
@@ -202,16 +234,13 @@ if (window.ytCommentsAnalyzerInitialized) {
         sendCommentToServer(nextTask);
     }
 
-
-
-
-    async function scrapeAndProcessComments() { // async로 변경하여 내부 await 사용 가능 (선택적이지만, 복잡한 DOM 조작 시 유용할 수 있음)
+    async function scrapeAndProcessComments() {
         if (isScraping) {
-            console.log("YouTube 댓글 분석기: 이미 스크래핑 진행 중. 이번 호출 건너뜀.");
+            // console.log("YouTube 댓글 분석기: 이미 스크래핑 진행 중. 이번 호출 건너뜀.");
             return;
         }
         isScraping = true;
-        console.log("YouTube 댓글 분석기: 🔍 댓글 스캔 시작...");
+        // console.log("YouTube 댓글 분석기: 🔍 댓글 스캔 시작...");
 
         try {
             const commentElements = document.querySelectorAll(COMMENT_WRAPPER_SELECTOR);
@@ -219,120 +248,113 @@ if (window.ytCommentsAnalyzerInitialized) {
 
             commentElements.forEach(el => {
                 const currentAnalyzerState = el.dataset.analyzerState;
-                // 이미 최종 처리된 (processed_normal, processed_hate) 댓글은 건너뜀
-                if (currentAnalyzerState === 'processed_normal' || currentAnalyzerState === 'processed_hate') {
-                    return;
-                }
-
-                let originalTextForThisComment;
-                const contentWrapper = el.querySelector(CONTENT_WRAPPER_SELECTOR);
-                if (!contentWrapper) return;
-
-                // 1. 원본 텍스트 확보 (수정된 로직)
-                if (el.dataset.originalContentAnalyzer) {
-                    // dataset에 저장된 원본 텍스트가 최우선
-                    originalTextForThisComment = el.dataset.originalContentAnalyzer;
-                } else if (currentAnalyzerState === 'checking') {
-                    // UI는 'checking'인데 dataset에 원본이 없는 경우 (이론상 발생하면 안되지만 방어 코드)
-                    // 숨겨진 span에서 가져오기 시도
-                    const hiddenSpan = contentWrapper.querySelector(`.${HIDDEN_ORIGINAL_SPAN_CLASS}`);
-                    if (hiddenSpan && hiddenSpan.textContent) {
-                        originalTextForThisComment = hiddenSpan.textContent.trim();
-                    } else {
-                        // console.warn("YouTube 댓글 분석기: 'checking' 상태지만 원본 텍스트 확보 불가 (dataset 및 hidden span 모두 실패)", el);
-                        return; // 원본 없으면 처리 불가
-                    }
-                } else {
-                    // UI가 아직 'checking'이 아니고, dataset에도 원본이 없는 초기 상태 (완전 새 댓글)
-                    const currentVisibleText = contentWrapper.textContent?.trim();
-                    // "확인중..." 이나 "검열됨" 문자열이 아닌, 실제 내용일 때만 원본으로 간주
-                    if (currentVisibleText && currentVisibleText !== CHECKING_TEXT && currentVisibleText !== CENSORED_TEXT) {
-                        originalTextForThisComment = currentVisibleText;
-                    } else {
-                        // console.warn("YouTube 댓글 분석기: 초기 스캔에서 유효한 원본 텍스트 확보 불가 (내용 없거나 UI 문자열)", el, currentVisibleText);
-                        return; // 유효한 원본 아니면 처리 불가
-                    }
-                }
+                const originalTextForThisComment = getOriginalTextFromElement(el);
 
                 if (!originalTextForThisComment) {
-                    // console.warn("YouTube 댓글 분석기: 최종적으로 원본 텍스트 확보 실패", el);
+                    // console.warn("YouTube 댓글 분석기: 스캔 중 유효한 원본 텍스트 확보 불가", el);
                     return;
                 }
 
-                // 2. Comment ID 생성 (확보된 순수 원본 텍스트 기준)
-                const contentId = getCommentId(el, true, originalTextForThisComment);
+                const contentId = generateCommentId(originalTextForThisComment);
                 if (!contentId) {
                     // console.warn("YouTube 댓글 분석기: Comment ID 생성 실패", originalTextForThisComment.slice(0,30));
                     return;
                 }
 
+                // Ensure original text is stored in dataset for future reference by UI functions
+                if (!el.dataset.originalContentAnalyzer) {
+                    el.dataset.originalContentAnalyzer = originalTextForThisComment;
+                }
+
+
                 const commentDataEntry = currentCommentsData[contentId];
 
-                if (commentDataEntry) { // 데이터 저장소에 이미 있는 댓글 (ID 기준)
+                if (commentDataEntry) {
+                    if (commentDataEntry.userOverridden) {
+                        // If user manually reverted, ensure UI is normal and skip further processing for this element
+                        if (currentAnalyzerState !== 'processed_normal') {
+                            // console.log(`YouTube 댓글 분석기: 사용자 복원 상태 유지 (ID: ${contentId.slice(0, 50)})`);
+                            restoreElementUIToNormal(el); // Don't pass fromUserAction here
+                        }
+                        addCustomActionButtonToComment(el); // Ensure button is present
+                        return; // Skip further processing for this element
+                    }
+
                     if (commentDataEntry.processed) {
-                        if (currentAnalyzerState !== 'processed_normal' && currentAnalyzerState !== 'processed_hate') {
-                            console.log(`YouTube 댓글 분석기: 저장된 분석 결과 적용 (ID: ${contentId.slice(0, 50)}), 상태: ${commentDataEntry.classification}`);
-                            el.dataset.originalContentAnalyzer = commentDataEntry.originalTextSnapshot; // 복구 위해 원본 다시 확인
-                            if (commentDataEntry.classification === "정상") {
-                                restoreElementUIToNormal(el);
-                            } else if (commentDataEntry.classification === "혐오") {
-                                setElementUIToCensored(el);
-                            }
+                        // Apply stored classification if UI doesn't match
+                        if (commentDataEntry.classification === "혐오" && currentAnalyzerState !== 'processed_hate') {
+                            // console.log(`YouTube 댓글 분석기: 저장된 '혐오' 분석 결과 적용 (ID: ${contentId.slice(0, 50)})`);
+                            setElementUIToCensored(el);
+                        } else if (commentDataEntry.classification === "정상" && currentAnalyzerState !== 'processed_normal') {
+                            // console.log(`YouTube 댓글 분석기: 저장된 '정상' 분석 결과 적용 (ID: ${contentId.slice(0, 50)})`);
+                            restoreElementUIToNormal(el);
                         }
                     } else if (commentDataEntry.sending) {
                         if (currentAnalyzerState !== 'checking') {
-                            // 이미 보내는 중인 댓글의 다른 DOM 요소가 발견된 경우
                             setElementUIToChecking(el, commentDataEntry.originalTextSnapshot);
-                            // console.log(`YouTube 댓글 분석기: 이미 전송중인 다른 요소 UI 'checking'으로 변경 (ID: ${contentId.slice(0, 50)})`);
                         }
-                    } else { // 재시도 로직 (not processed, not sending, e.g. error)
-                        console.log(`YouTube 댓글 분석기: 미처리/미전송 댓글 재요청 준비 (ID: ${contentId.slice(0, 50)})`);
+                    } else { // Not processed, not sending (e.g., error or initial state for a known ID)
+                        // console.log(`YouTube 댓글 분석기: 미처리/미전송 댓글 재요청 준비 (ID: ${contentId.slice(0, 50)})`);
                         setElementUIToChecking(el, commentDataEntry.originalTextSnapshot);
                         currentCommentsData[contentId].sending = true;
                         currentCommentsData[contentId].uiState = 'checking';
-                        requestQueue.push({ el, id: contentId, text: commentDataEntry.originalTextSnapshot, videoId: getVideoId() });
+                        requestQueue.push({ id: contentId, text: commentDataEntry.originalTextSnapshot, videoId: getVideoId() });
                         newTasksAddedToQueue++;
                     }
-                } else { // 새로운 내용의 댓글 발견
-                    console.log(`YouTube 댓글 분석기: 새 댓글 발견, 처리 대기열 추가 (ID: ${contentId.slice(0, 50)}) Text: "${originalTextForThisComment.slice(0, 30)}"`);
+                } else { // New comment
+                    // console.log(`YouTube 댓글 분석기: 새 댓글 발견, 처리 대기열 추가 (ID: ${contentId.slice(0, 50)}) Text: "${originalTextForThisComment.slice(0, 30)}"`);
                     setElementUIToChecking(el, originalTextForThisComment);
                     currentCommentsData[contentId] = {
                         originalTextSnapshot: originalTextForThisComment,
                         processed: false,
                         sending: true,
                         uiState: 'checking',
-                        classification: null
+                        classification: null,
+                        userOverridden: false // Initialize new flag
                     };
-                    requestQueue.push({ el, id: contentId, text: originalTextForThisComment, videoId: getVideoId() });
+                    requestQueue.push({ id: contentId, text: originalTextForThisComment, videoId: getVideoId() });
                     newTasksAddedToQueue++;
                 }
-                addCustomActionButtonToComment(el); // 커스텀 버튼 추가
+                addCustomActionButtonToComment(el);
             });
 
             if (newTasksAddedToQueue > 0) {
                 if (!queueFillStartTime && !queueProcessingFinished) {
                     queueFillStartTime = performance.now();
-                    console.log(`YouTube 댓글 분석기: ⏱️ 큐 채워지고 처리 시작 시간 기록됨 (${newTasksAddedToQueue}개 작업).`);
+                    // console.log(`YouTube 댓글 분석기: ⏱️ 큐 채워지고 처리 시작 시간 기록됨 (${newTasksAddedToQueue}개 작업).`);
                 }
-                console.log(`YouTube 댓글 분석기: ${newTasksAddedToQueue}개의 새 작업이 큐에 추가됨. 큐 처리 시작.`);
+                // console.log(`YouTube 댓글 분석기: ${newTasksAddedToQueue}개의 새 작업이 큐에 추가됨. 큐 처리 시작.`);
                 processRequestQueue();
             }
         } catch (error) {
             console.error("YouTube 댓글 분석기: scrapeAndProcessComments 중 오류 발생", error);
         } finally {
             isScraping = false;
-            // console.log("YouTube 댓글 분석기: 댓글 스캔 완료 (isScraping=false).");
         }
     }
 
 
     function applyCensorshipToMatchingElements(targetContentId, classification, reason) {
-        console.log(`YouTube 댓글 분석기: 📝 서버 결과 DOM 반영 시도 (ID: ${targetContentId.slice(0, 50)}, Class: ${classification})`);
+        // console.log(`YouTube 댓글 분석기: 📝 서버 결과 DOM 반영 시도 (ID: ${targetContentId.slice(0, 50)}, Class: ${classification})`);
         let updatedCount = 0;
         document.querySelectorAll(COMMENT_WRAPPER_SELECTOR).forEach(el => {
-            if (el.dataset.analyzerState === 'checking') {
-                const elContentId = getCommentIdFromHiddenSpan(el);
-                if (elContentId === targetContentId) {
+            // We need to get the ID based on its stored original text
+            const originalTextForThisElement = getOriginalTextFromElement(el);
+            const elContentId = generateCommentId(originalTextForThisElement);
+
+            if (elContentId === targetContentId) {
+                const commentData = currentCommentsData[targetContentId];
+                if (commentData && commentData.userOverridden) {
+                    // console.log(`YouTube 댓글 분석기: 사용자 복원 상태이므로 서버 결과(${classification}) 무시 (ID: ${targetContentId.slice(0,50)})`);
+                    // Ensure UI is normal if it somehow got changed
+                    if (el.dataset.analyzerState !== 'processed_normal') {
+                        restoreElementUIToNormal(el);
+                    }
+                    return; // Skip applying server result
+                }
+
+                // Only update if currently in 'checking' state or if classification changed
+                if (el.dataset.analyzerState === 'checking' || (commentData && commentData.classification !== classification)) {
                     if (classification === "정상") {
                         restoreElementUIToNormal(el);
                     } else if (classification === "혐오") {
@@ -345,20 +367,23 @@ if (window.ytCommentsAnalyzerInitialized) {
                 }
             }
         });
-        if (updatedCount > 0) {
-            console.log(`YouTube 댓글 분석기: ${updatedCount}개 요소 UI 업데이트 완료 (ID: ${targetContentId.slice(0, 50)})`);
-        }
+        // if (updatedCount > 0) {
+        //     console.log(`YouTube 댓글 분석기: ${updatedCount}개 요소 UI 업데이트 완료 (ID: ${targetContentId.slice(0, 50)})`);
+        // }
     }
 
     function restoreAllMatchingElementsToNormalOnError(targetContentId) {
         console.warn(`YouTube 댓글 분석기: 오류 발생, ID ${targetContentId.slice(0, 50)} 관련 댓글 원상 복구 시도.`);
         let restoredCount = 0;
         document.querySelectorAll(COMMENT_WRAPPER_SELECTOR).forEach(el => {
-            if (el.dataset.analyzerState === 'checking') {
-                const elContentId = getCommentIdFromHiddenSpan(el);
-                if (elContentId === targetContentId) {
+            const originalTextForThisElement = getOriginalTextFromElement(el);
+            const elContentId = generateCommentId(originalTextForThisElement);
+
+            if (elContentId === targetContentId) {
+                // Only restore if it was in a 'checking' state, to avoid overriding user actions or already processed states
+                if (el.dataset.analyzerState === 'checking') {
                     restoreElementUIToNormal(el);
-                    el.dataset.analyzerState = 'error_restored';
+                    el.dataset.analyzerState = 'error_restored'; // Keep a distinct state for debugging
                     restoredCount++;
                 }
             }
@@ -380,11 +405,24 @@ if (window.ytCommentsAnalyzerInitialized) {
                     }
                 }
             }
+            // Also check for text content changes within existing comments,
+            // though this is less common for YouTube comments after initial load.
+            // However, edits could trigger this.
+            if (mutation.type === "characterData" && mutation.target.parentElement.closest(COMMENT_WRAPPER_SELECTOR)) {
+                // Check if the parent comment wrapper is not already being processed or in a final state
+                const commentWrapper = mutation.target.parentElement.closest(COMMENT_WRAPPER_SELECTOR);
+                if (commentWrapper && (!commentWrapper.dataset.analyzerState || commentWrapper.dataset.analyzerState === 'error_restored')) {
+                    // console.log("YouTube 댓글 분석기: 📝 기존 댓글 내용 변경 감지. 재스캔 고려.");
+                    // This could be an edit. We might want to re-evaluate.
+                    // For now, let's treat it like a new change.
+                    newRelevantChanges = true;
+                }
+            }
             if (newRelevantChanges) break;
         }
 
         if (newRelevantChanges) {
-            console.log("YouTube 댓글 분석기: ➕ 새로운 댓글 관련 노드 추가 감지. 디바운스 타이머 설정.");
+            // console.log("YouTube 댓글 분석기: ➕ 새로운 댓글/내용 변경 관련 노드 추가 감지. 디바운스 타이머 설정.");
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(() => {
                 scrapeAndProcessComments();
@@ -396,7 +434,7 @@ if (window.ytCommentsAnalyzerInitialized) {
         const commentsSectionElement = document.querySelector(COMMENTS_SECTION_SELECTOR);
 
         if (!commentsSectionElement) {
-            console.log("YouTube 댓글 분석기: 댓글 섹션(", COMMENTS_SECTION_SELECTOR, ")을 아직 찾을 수 없음. 0.5초 후 재시도.");
+            // console.log("YouTube 댓글 분석기: 댓글 섹션(", COMMENTS_SECTION_SELECTOR, ")을 아직 찾을 수 없음. 0.5초 후 재시도.");
             setTimeout(initializeAndStartObserver, 500);
             return;
         }
@@ -406,7 +444,7 @@ if (window.ytCommentsAnalyzerInitialized) {
 
         if (commentObserver) commentObserver.disconnect();
         commentObserver = new MutationObserver(handleCommentMutations);
-        commentObserver.observe(commentsSectionElement, { childList: true, subtree: true });
+        commentObserver.observe(commentsSectionElement, { childList: true, subtree: true, characterData: true }); // Added characterData
 
         window.addEventListener('unload', () => {
             if (commentObserver) commentObserver.disconnect();
@@ -414,183 +452,148 @@ if (window.ytCommentsAnalyzerInitialized) {
         });
     }
 
-
-
-    // 새로운 버튼을 생성하고 댓글의 액션 메뉴에 추가하는 함수
     function addCustomActionButtonToComment(commentElement) {
-        // ... (DEBUG 로그 및 상단 로직은 이전과 동일하게 유지 또는 필요에 따라 사용) ...
-        console.log("DEBUG: addCustomActionButtonToComment CALLED for element:", commentElement);
+        // console.log("DEBUG: addCustomActionButtonToComment CALLED for element:", commentElement);
 
         const actionMenuContainer = commentElement.querySelector('div#action-menu');
         if (!actionMenuContainer) {
-            console.warn("DEBUG: Action menu container (div#action-menu) not found.");
+            // console.warn("DEBUG: Action menu container (div#action-menu) not found.");
             return;
         }
 
-        // 이미 커스텀 메뉴 렌더러가 추가되었는지 확인하여 중복 추가 방지
         if (actionMenuContainer.querySelector(`.${CUSTOM_MENU_RENDERER_CLASS}`)) {
-            // console.log("DEBUG: Custom menu renderer already exists. Skipping button addition.");
             return;
         }
 
         const existingMenuRenderer = actionMenuContainer.querySelector('ytd-menu-renderer');
         if (!existingMenuRenderer) {
-            console.warn("DEBUG: Existing ytd-menu-renderer not found.");
+            // console.warn("DEBUG: Existing ytd-menu-renderer not found.");
             return;
         }
 
-        // 기존 메뉴 렌더러를 복제하여 새로운 메뉴 렌더러 생성
-        const newMenuRenderer = existingMenuRenderer.cloneNode(true); // true로 자식 노드까지 복제
-        newMenuRenderer.classList.add(CUSTOM_MENU_RENDERER_CLASS); // 커스텀 클래스 추가
+        const newMenuRenderer = existingMenuRenderer.cloneNode(true);
+        newMenuRenderer.classList.add(CUSTOM_MENU_RENDERER_CLASS);
 
-        // 복제된 새 메뉴 렌더러의 기존 자식들(아이템들)을 모두 제거 (새 버튼만 넣기 위함)
         while (newMenuRenderer.firstChild) {
             newMenuRenderer.removeChild(newMenuRenderer.firstChild);
         }
 
-        // 기존 메뉴 렌더러 내의 버튼을 샘플로 사용 (스타일 복사 목적)
         const sampleExistingButton = existingMenuRenderer.querySelector('yt-icon-button#button.dropdown-trigger');
-        // console.log("DEBUG: Sample existing button (dropdown-trigger):", sampleExistingButton);
 
-        // 새로운 yt-icon-button 생성
         const newButton = document.createElement('yt-icon-button');
         if (sampleExistingButton) {
-            newButton.className = sampleExistingButton.className; // 클래스 복사
-            newButton.classList.remove('dropdown-trigger'); // 드롭다운 기능은 필요 없으므로 제거
-            if (sampleExistingButton.hasAttribute('style-target')) { // style-target 속성이 있다면 복사
+            newButton.className = sampleExistingButton.className;
+            newButton.classList.remove('dropdown-trigger');
+            if (sampleExistingButton.hasAttribute('style-target')) {
                 newButton.setAttribute('style-target', sampleExistingButton.getAttribute('style-target'));
             }
         } else {
-            // 샘플 버튼이 없는 경우 기본 클래스 추가 (방어 코드)
             newButton.classList.add('style-scope', 'ytd-menu-renderer');
         }
-        newButton.classList.add(CUSTOM_ACTION_BUTTON_CLASS); // 커스텀 버튼 식별 클래스 추가
+        newButton.classList.add(CUSTOM_ACTION_BUTTON_CLASS);
 
-        // 버튼 내부의 <button> 요소 생성
         const buttonInner = document.createElement('button');
         const sampleInnerButton = sampleExistingButton ? sampleExistingButton.querySelector('button#button') : null;
         if (sampleInnerButton) {
-            buttonInner.className = sampleInnerButton.className; // 내부 버튼 클래스 복사
+            buttonInner.className = sampleInnerButton.className;
         } else {
-            buttonInner.classList.add('style-scope', 'yt-icon-button'); // 기본 클래스
+            buttonInner.classList.add('style-scope', 'yt-icon-button');
         }
-        buttonInner.id = 'button'; // YouTube 구조상 id가 'button'인 경우가 많음
-        buttonInner.setAttribute('aria-label', '분석기 작업 (느낌표)'); // 접근성을 위한 레이블
+        buttonInner.id = 'button';
+        buttonInner.setAttribute('aria-label', '분석기 작업 (단어 신고)');
 
 
-        // --- yt-icon 생성 및 내부 구조를 appendChild로 직접 구성 ---
-        const icon = document.createElement('yt-icon2'); // yt-icon 대신 yt-icon 사용 (YouTube 최신 구조)
+        const icon = document.createElement('yt-icon2'); // Changed to yt-icon from yt-icon2
         const sampleIcon = sampleExistingButton ? sampleExistingButton.querySelector('yt-icon') : null;
         if (sampleIcon) {
-            icon.className = sampleIcon.className; // yt-icon의 클래스 복사
+            icon.className = sampleIcon.className;
         } else {
-            icon.classList.add('style-scope', 'ytd-menu-renderer'); // 기본 클래스
+            icon.classList.add('style-scope', 'ytd-menu-renderer');
         }
 
-        // 1. <span class="yt-icon-shape ..."> 생성
         const iconShapeSpan = document.createElement('span');
         const sampleIconShape = sampleIcon ? sampleIcon.querySelector('span.yt-icon-shape') : null;
         if (sampleIconShape) {
             iconShapeSpan.className = sampleIconShape.className;
         } else {
-            // 기본 클래스 설정 (YouTube 구조 참조)
             iconShapeSpan.classList.add('yt-icon-shape', 'style-scope', 'yt-icon', 'yt-spec-icon-shape');
         }
 
-        // 2. <div style="width: 100%; ..."> 생성 (SVG를 감싸는 div)
         const svgContainerDiv = document.createElement('div');
         svgContainerDiv.style.width = '100%';
         svgContainerDiv.style.height = '100%';
         svgContainerDiv.style.display = 'block';
-        // svgContainerDiv.style.fill = 'currentColor'; // SVG 자체에 fill을 줄 것이므로 여기선 생략 가능
 
-        // 3. <svg> 요소 생성
         const svgElement = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         svgElement.setAttribute('height', '24px');
         svgElement.setAttribute('viewBox', '0 0 24 24');
         svgElement.setAttribute('width', '24px');
-        svgElement.setAttribute('fill', 'gold'); // 노란색 느낌표
+        svgElement.setAttribute('fill', 'gold');
         svgElement.setAttribute('focusable', 'false');
         svgElement.setAttribute('aria-hidden', 'true');
-        // SVG에 직접 스타일 적용 (기존 YouTube SVG 구조 참조)
         svgElement.style.pointerEvents = 'none';
         svgElement.style.display = 'inherit';
         svgElement.style.width = '100%';
         svgElement.style.height = '100%';
 
-
-        // 4. <path> 요소들 생성 (배경 없음, 느낌표)
         const pathBg = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         pathBg.setAttribute('d', 'M0 0h24v24H0V0z');
         pathBg.setAttribute('fill', 'none');
 
         const pathExclamation = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         pathExclamation.setAttribute('d', 'M11 15h2v2h-2zm0-8h2v6h-2z');
-        // pathExclamation은 부모 svg의 fill="gold"를 상속받음
 
-        // 5. 요소들을 계층적으로 appendChild
         svgElement.appendChild(pathBg);
         svgElement.appendChild(pathExclamation);
         svgContainerDiv.appendChild(svgElement);
         iconShapeSpan.appendChild(svgContainerDiv);
-        icon.appendChild(iconShapeSpan); // 최종적으로 icon (yt-icon)에 iconShapeSpan을 추가
+        icon.appendChild(iconShapeSpan);
 
-        // console.log("DEBUG: Constructed icon (yt-icon) with children. icon.innerHTML:", icon.innerHTML);
-        // --- 아이콘 구성 완료 ---
+        buttonInner.appendChild(icon);
+        newButton.appendChild(buttonInner);
 
-        buttonInner.appendChild(icon); // 내부 버튼에 아이콘 추가
-        newButton.appendChild(buttonInner); // yt-icon-button에 내부 버튼 추가
-
-        // yt-interaction 요소 (클릭 시 물결 효과) 추가
         const sampleInteraction = sampleExistingButton ? sampleExistingButton.querySelector('yt-interaction#interaction') : null;
         if (sampleInteraction) {
             const interaction = sampleInteraction.cloneNode(true);
             newButton.appendChild(interaction);
         } else {
-            // 샘플이 없을 경우 기본 yt-interaction 생성 (방어 코드)
             const interaction = document.createElement('yt-interaction');
             interaction.id = 'interaction';
             interaction.classList.add('circular', 'style-scope', 'yt-icon-button');
-            // yt-interaction의 내부 구조는 복잡하므로, 간단히 innerHTML로 설정하거나,
-            // 더 정확하게는 YouTube의 실제 구조를 참조하여 생성해야 함.
-            // 여기서는 간단히 비워두거나, 기본 구조를 넣을 수 있음.
-            // 예: interaction.innerHTML = `<div class="stroke style-scope yt-interaction"></div><div class="fill style-scope yt-interaction"></div>`;
             newButton.appendChild(interaction);
         }
 
-
-        // 새 버튼에 클릭 이벤트 리스너 추가
         newButton.addEventListener('click', async (event) => {
             event.stopPropagation();
             event.preventDefault();
 
-            const commentText = commentElement.querySelector(CONTENT_WRAPPER_SELECTOR)?.textContent?.trim();
+            const originalCommentText = getOriginalTextFromElement(commentElement) ||
+                commentElement.querySelector(CONTENT_WRAPPER_SELECTOR)?.textContent?.trim();
 
-            const wordToReport = prompt("신고할 단어를 입력하세요:");
+
+            const wordToReport = prompt("신고할 단어를 입력하세요 (댓글 내용: " + originalCommentText.slice(0, 50) + "...):");
             if (!wordToReport) return;
 
             const reason = prompt("신고 사유를 입력하세요:");
             if (!reason) return;
 
-
             try {
                 const response = await fetch(SERVER_REPORT_WORD_URL, {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         word: wordToReport,
                         reason: reason,
-                        context: commentText // optional: 댓글 원문도 같이 보내기
+                        context: originalCommentText
                     })
                 });
 
                 if (response.ok) {
-                    const result = await response.json();
+                    await response.json(); // result not used for now
                     alert("신고가 접수되었습니다!");
                 } else {
-                    alert("서버 응답 오류!");
+                    const errorData = await response.text();
+                    alert(`서버 응답 오류: ${response.status} ${errorData}`);
                 }
             } catch (err) {
                 console.error("Fetch error:", err);
@@ -598,12 +601,8 @@ if (window.ytCommentsAnalyzerInitialized) {
             }
         });
 
-        // 완성된 새 버튼을 새 메뉴 렌더러에 추가
         newMenuRenderer.appendChild(newButton);
-
-        // 기존 메뉴 렌더러 뒤에 새로운 메뉴 렌더러를 삽입
         existingMenuRenderer.insertAdjacentElement('afterend', newMenuRenderer);
-        // console.log("DEBUG: --- addCustomActionButtonToComment FINISHED ---");
     }
 
     if (document.readyState === 'loading') {
