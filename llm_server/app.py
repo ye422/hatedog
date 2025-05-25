@@ -10,6 +10,9 @@ import time # 각 댓글 처리 시간 측정을 위해 (선택 사항)
 from flask import Flask, request, jsonify
 from db import init_db, db, add_report, get_word_report_count, get_reason_list_for_word, erase_db
 
+# 새로 만든 모듈에서 함수 import
+from vectorDB_update import process_triggered_report 
+
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///reports.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -153,21 +156,37 @@ def report_word():
     reason = data.get("reason")
 
     if not word or not reason:
+        app.logger.warning("'/report_word' 요청: word 또는 reason 누락.")
         return jsonify({'error': 'word and reason are required'}), 400
 
-    add_report(word, reason)
+    try:
+        add_report(word, reason) # DB에 신고 추가
+        app.logger.info(f"새로운 신고 추가: 단어='{word}', 사유='{reason[:30]}...'")
 
-    count = get_word_report_count(word)
-    if count == 10:
-        reasons = get_reason_list_for_word(word)
-        # LLM 호출 함수 연결 가능
-        print(f"[🧠 정의 유추 필요] {word} - 신고 사유: {reasons}")
-        # 정의 만든 word를 DB에서 삭제
-        erase_db(word)
-        reasons2 = get_reason_list_for_word(word)
-        print(reasons2)
+        report_count = get_word_report_count(word)
+        app.logger.info(f"단어 '{word}'의 현재 신고 횟수: {report_count}")
 
-    return jsonify({'status': 'ok'})
+        # 신고 횟수가 10회 이상일 때 처리 로직 실행 (config.py 등에서 임계값 관리 권장)
+        REPORT_THRESHOLD = 10 
+        if report_count >= REPORT_THRESHOLD:
+            app.logger.info(f"단어 '{word}' 신고 {REPORT_THRESHOLD}회 도달. 자동 처리 시작.")
+            
+            # vectorDB_update.py (또는 report_processor.py)의 함수 호출
+            # 이 함수 내부에서 get_reason_list_for_word, LLM 호출, CSV 업데이트, VectorDB 업데이트, erase_db 모두 처리
+            success = process_triggered_report(word) 
+            
+            if success:
+                app.logger.info(f"단어 '{word}' 자동 처리 성공.")
+            else:
+                app.logger.error(f"단어 '{word}' 자동 처리 중 문제 발생. vectorDB_update.py 로그 확인 필요.")
+                # 실패 시 어떤 응답을 줄지, DB에서 신고 기록을 어떻게 할지 정책 필요
+                # 예: 실패 시 erase_db를 호출하지 않아 다음 신고 시 재시도 기회 부여
+        
+        return jsonify({'status': 'ok', 'report_count': report_count})
+
+    except Exception as e:
+        app.logger.error(f"'/report_word' 처리 중 예외 발생: {e}", exc_info=True)
+        return jsonify({'error': 'Internal server error during report processing'}), 500
 
 if __name__ == '__main__':
     # Gunicorn 등 WSGI 서버 사용 시에는 이 로깅 설정이 다르게 적용될 수 있음
