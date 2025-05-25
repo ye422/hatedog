@@ -27,7 +27,7 @@ def generate_csv_entry_from_report(word: str, reasons: List[str]) -> Optional[Di
     # 여기서는 설명을 위해 간단히 문자열로 구성합니다.
     # 실제로는 llm_analyzer.py에 있는 PromptTemplate 객체를 재활용하거나 유사하게 정의합니다.
     prompt_str = f"""다음은 사용자들이 '{word}' 단어에 대해 신고한 내용과 그 사유들입니다.
-이 정보를 바탕으로, 해당 단어가 어떤 범주의 혐오 표현인지, 그 정의/맥락은 무엇인지 분석하여 CSV 형식의 데이터를 한 줄 생성해주세요.
+이 정보를 바탕으로, 해당 단어가 어떤 범주의 표현인지, 그 정의/맥락은 무엇인지 분석하여 CSV 형식의 데이터를 한 줄 생성해주세요.
 
 [신고된 단어]: {word}
 

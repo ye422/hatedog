@@ -10,7 +10,7 @@
     "host_permissions": [
         "*://*.youtube.com/*",
         "http://127.0.0.1:5000/*",
-        "https://368b-34-125-3-70.ngrok-free.app/*"
+        "https://b146-34-124-222-31.ngrok-free.app/*"
     ],
     "background": {
         "service_worker": "background.js"
