@@ -8,7 +8,7 @@
 
 ## 🚀 Colab에서 바로 실행하기
 
-📎 [Colab에서 실행](https://colab.research.google.com/github/ye422/hatedog/blob/main/run.ipynb)
+📎 [Colab에서 실행](https://colab.research.google.com/github/hatedogs/hatedog/blob/main/run.ipynb)
 
 > ✅ **이 프로젝트는 Colab 환경에서 테스트되고 개발되었습니다.**  
 > 로컬 환경 설정 없이 바로 실행해보기에 가장 간단한 방법입니다.
