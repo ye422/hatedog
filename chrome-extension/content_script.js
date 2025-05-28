@@ -30,8 +30,8 @@ if (window.ytCommentsAnalyzerInitialized) {
     let queueProcessingFinished = false; // 큐 처리 시간 측정을 한 번만 하기 위한 플래그
 
     // --- 상태 및 UI 관련 클래스 ---
-    const CHECKING_TEXT = "확인중...";
-    const CENSORED_TEXT = "검열됨";
+    const CHECKING_TEXT = "댓글을 확인하고 있어요...🦮";
+    const CENSORED_TEXT = "나쁜 말은 물어갔어요! 🐕";
     const CLASS_CHECKING = "yt-comment-analyzer-checking";
     const CLASS_FILTERED_HATE = "yt-comment-analyzer-filtered-hate";
     const CLASS_PROCESSED_NORMAL = "yt-comment-analyzer-processed-normal";
