@@ -2,7 +2,7 @@ import logging
 import csv
 import os
 from typing import List, Dict, Optional
-
+from langchain_openai import ChatOpenAI
 from langchain_core.documents import Document # VectorDB 업데이트를 위해 필요
 
 # 필요한 모듈 및 설정값 import
@@ -12,22 +12,24 @@ from db import get_reason_list_for_word, erase_db # DB 함수 접근
 
 logger = logging.getLogger(__name__)
 
+
 def generate_csv_entry_from_report(word: str, reasons: List[str]) -> Optional[Dict[str, str]]:
     """
-    LLM을 사용하여 신고된 단어와 사유들을 기반으로 CSV에 추가할 새로운 항목을 생성합니다.
+    GPT-4.1을 사용하여 신고된 단어와 사유들을 기반으로 CSV에 추가할 새로운 항목을 생성합니다.
     """
-    if not llm_analyzer.chat_openai_model: # llm_analyzer의 전역 모델 사용
-        logger.error("ChatOpenAI model not initialized (via llm_analyzer). Cannot generate new entry.")
+    # 고정된 GPT-4.1 모델 사용 (llm_analyzer와 독립)
+    try:
+        definition_gen_model = ChatOpenAI(model="gpt-4.1", temperature=0.3)
+    except Exception as e:
+        logger.error("모델 초기화 실패", exc_info=True)
         return None
 
-    known_categories = ["정치", "게임", "젠더", "인종", "기타 (계층/직업)", "기타 (일반)"] # 필요시 config로 이동
-
+    known_categories = ["정치", "게임", "젠더", "인종", "기타 (계층/직업)", "기타 (일반)"]
     reasons_str = "\n- ".join(reasons)
-    # PromptTemplate은 여기서 직접 정의하거나, llm_analyzer 또는 config에 정의된 것을 가져올 수 있습니다.
-    # 여기서는 설명을 위해 간단히 문자열로 구성합니다.
-    # 실제로는 llm_analyzer.py에 있는 PromptTemplate 객체를 재활용하거나 유사하게 정의합니다.
+
     prompt_str = f"""다음은 사용자들이 '{word}' 단어에 대해 신고한 내용과 그 사유들입니다.
-이 정보를 바탕으로, 해당 단어가 어떤 범주의 표현인지, 그 정의/맥락은 무엇인지 분석하여 CSV 형식의 데이터를 한 줄 생성해주세요.
+이 정보를 바탕으로, 해당 단어가 어떤 범주의 혐오 표현인지, 그리고 어떤 맥락/의미로 사용되는지를 정리하여
+CSV 형식의 데이터를 한 줄 생성해주세요.
 
 [신고된 단어]: {word}
 
@@ -35,64 +37,66 @@ def generate_csv_entry_from_report(word: str, reasons: List[str]) -> Optional[Di
 - {reasons_str}
 
 [출력 형식 (정확히 이 형식으로만 응답)]:
-범주,예시표현,간략 정의/맥락,label
+범주,예시표현,간략 정의/맥락
 
 [세부 지침]:
-1.  '예시표현'은 주어진 [신고된 단어]를 그대로 사용합니다.
-2.  'label'은 "혐오 발언"일 수도 있고, "정상(ex. 신조어)"일 수도 있습니다. 
-3.  '범주'는 다음 목록 중에서 가장 적절한 것을 선택해야 합니다: {", ".join(known_categories)}
-    만약 목록에 적절한 범주가 없다면, 가장 유사한 것을 선택하거나 "기타 (일반)"으로 분류하고, '간략 정의/맥락'에 그 이유를 포함해주세요.
-4.  '간략 정의/맥락'은 신고 사유들을 종합하여, 해당 단어가 왜 혐오 혹은 신조어어 표현인지 명확하고 간결하게 한두 문장으로 설명합니다.
+1. '예시표현'은 주어진 [신고된 단어]를 그대로 사용합니다.
+2. '범주'는 다음 목록 중 가장 적절한 것을 선택해야 합니다: {", ".join(known_categories)}
+   만약 적절한 항목이 없다면 '기타 (일반)'으로 지정하고, 정의/맥락에 그 이유를 포함해주세요.
+3. '간략 정의/맥락'은 신고 사유들을 종합하여, 해당 단어가 왜 혐오 표현으로 간주되는지를
+   명확하고 간결하게 한두 문장으로 설명합니다.
 
 [생성된 CSV 데이터 (한 줄)]:
 """
-    
-    logger.info(f"LLM에 새로운 혐오 표현 항목 생성을 요청합니다. 단어: {word}")
-    logger.debug(f"생성 프롬프트:\n{prompt_str}")
+
+    logger.info(f"새로운 혐오 표현 항목 생성을 요청합니다. 단어: {word}")
+    logger.debug(f"프롬프트:\n{prompt_str}")
 
     try:
-        response = llm_analyzer.chat_openai_model.invoke(prompt_str) # llm_analyzer의 모델 사용
+        response = definition_gen_model.invoke(prompt_str)
         generated_csv_line = response.content if hasattr(response, 'content') else str(response)
         generated_csv_line = generated_csv_line.strip()
-        logger.info(f"LLM 응답 (단어: {word}): {generated_csv_line}")
+        logger.info(f"응답 (단어: {word}): {generated_csv_line}")
 
         parts = [p.strip().replace('"', '') for p in generated_csv_line.split(',')]
-        if len(parts) == 4:
-            category, expression, definition, label = parts
+        if len(parts) == 3:
+            category, expression, definition = parts
             if expression != word:
-                logger.warning(f"LLM 생성 '예시표현'({expression})이 원본 단어({word})와 다릅니다. 원본 단어를 사용합니다.")
+                logger.warning(f"예시표현이 원본 단어와 다름: {expression} → {word}로 변경")
                 expression = word
-            if label != "혐오 발언":
-                logger.warning(f"LLM 생성 'label'({label})이 '혐오 발언'이 아닙니다. '혐오 발언'으로 강제합니다.")
-                label = "혐오 발언"
-            
             return {
                 "범주": category,
                 "예시표현": expression,
-                "간략 정의/맥락": definition,
-                "label": label
+                "간략 정의/맥락": definition
             }
         else:
-            logger.error(f"LLM 응답 파싱 실패 (단어: {word}). 예상 형식과 다름: {generated_csv_line}")
+            logger.error(f"응답 파싱 실패: {generated_csv_line}")
             return None
+        
     except Exception as e:
-        logger.error(f"LLM 호출 중 오류 발생 (단어: {word}): {e}", exc_info=True)
+        logger.error(f"호출 오류 (단어: {word})", exc_info=True)
         return None
     
 def append_to_csv(new_entry: Dict[str, str], csv_filepath: str) -> bool:
     """
     주어진 항목을 CSV 파일에 추가합니다.
+    'label'은 항상 '혐오 발언'으로 고정합니다.
     """
     try:
         file_exists_and_not_empty = os.path.exists(csv_filepath) and os.path.getsize(csv_filepath) > 0
-        
+
+        # label 필드 강제 추가
+        complete_entry = new_entry.copy()
+        complete_entry["label"] = "혐오 발언"
+
         with open(csv_filepath, 'a', newline='', encoding='utf-8') as csvfile:
-            fieldnames = ["범주", "예시표현", "간략 정의/맥락", "label"] # CSV 헤더 순서 고정
+            fieldnames = ["범주", "예시표현", "간략 정의/맥락", "label"]  # 헤더 순서 고정
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             if not file_exists_and_not_empty:
                 writer.writeheader()
-            writer.writerow(new_entry)
-        logger.info(f"새 항목이 '{csv_filepath}'에 추가되었습니다: {new_entry}")
+            writer.writerow(complete_entry)
+
+        logger.info(f"새 항목이 '{csv_filepath}'에 추가되었습니다: {complete_entry}")
         return True
     except Exception as e:
         logger.error(f"CSV 파일 ('{csv_filepath}') 쓰기 중 오류: {e}", exc_info=True)
