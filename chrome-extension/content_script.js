@@ -562,7 +562,7 @@ if (window.ytCommentsAnalyzerInitialized) {
         buttonInner.setAttribute('aria-label', '분석기 작업 (단어 신고)');
 
 
-        const icon = document.createElement('yt-icon'); // yt-icon2 to yt-icon
+        const icon = document.createElement('yt-icon2');
         const sampleIcon = sampleExistingButton ? sampleExistingButton.querySelector('yt-icon') : null;
         if (sampleIcon) {
             icon.className = sampleIcon.className;
@@ -587,7 +587,7 @@ if (window.ytCommentsAnalyzerInitialized) {
         svgElement.setAttribute('height', '24px');
         svgElement.setAttribute('viewBox', '0 0 24 24');
         svgElement.setAttribute('width', '24px');
-        svgElement.setAttribute('fill', 'gold'); // Changed fill color for visibility
+        svgElement.setAttribute('fill', 'red'); // Changed fill color for visibility
         svgElement.setAttribute('focusable', 'false');
         svgElement.setAttribute('aria-hidden', 'true');
         svgElement.style.pointerEvents = 'none';
