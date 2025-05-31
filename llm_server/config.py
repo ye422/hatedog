@@ -61,4 +61,4 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 # --- Port Configuration ---
 PORT: int = int(os.getenv('PORT', 5000)) # Default to 5000 if not set
 
-KOELECTRA_BYPASS_THRESHOLD = float(os.getenv('KOELECTRA_BYPASS_THRESHOLD', 0.5)) # Threshold for bypassing KOELECTRA
+KOELECTRA_BYPASS_THRESHOLD = float(os.getenv('KOELECTRA_BYPASS_THRESHOLD', 0.9)) # Threshold for bypassing KOELECTRA
