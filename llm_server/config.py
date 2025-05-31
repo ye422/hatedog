@@ -43,7 +43,7 @@ MAX_NEW_TOKENS: int = int(os.getenv('MAX_NEW_TOKENS', 50)) # Matches notebook
 TEMPERATURE: float = float(os.getenv('TEMPERATURE', 0.1)) # Matches notebook
 TOP_P: float = float(os.getenv('TOP_P', 0.9)) # Matches notebook
 DO_SAMPLE: bool = os.getenv('DO_SAMPLE', 'True').lower() == 'true' # Matches notebook
-SIMILARITY_THRESHOLD: float = float(os.getenv('SIMILARITY_THRESHOLD', 0.5)) # Matches notebook
+SIMILARITY_THRESHOLD: float = float(os.getenv('SIMILARITY_THRESHOLD', 0.2)) # Matches notebook
 
 # --- CSV/Document Structure ---
 CONTENT_COLUMN_NAME: str = '예시표현'
@@ -60,3 +60,5 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 # --- Port Configuration ---
 PORT: int = int(os.getenv('PORT', 5000)) # Default to 5000 if not set
+
+KOELECTRA_BYPASS_THRESHOLD = float(os.getenv('KOELECTRA_BYPASS_THRESHOLD', 0.5)) # Threshold for bypassing KOELECTRA

@@ -320,6 +320,19 @@ def analyze_comment(comment_text: str) -> Dict[str, Any]:
         include_koelectra = "[KoELECTRA 모델 로드 실패]" not in koelectra_context_str and \
                             "판단 유보:" not in koelectra_context_str and \
                             koelectra_context_str.strip() != ""
+        koelectra_context_str, preds = get_koelectra_context(comment_text)
+        # threshold 기준: 확률 분포가 너무 높으면 KoELECTRA로만 판단
+        if any(p >= config.KOELECTRA_BYPASS_THRESHOLD for p in preds):
+            logger.info(f"KoELECTRA 확률이 threshold 0.8 이상이므로 LLM 호출 생략: {preds}")
+            active_labels = ["출신차별", "외모차별", "정치성향차별", "욕설", "연령차별", "성차별", "인종차별", "종교차별"]
+            detected = [label for label, v in zip(active_labels, preds) if v >= 0.8]
+            return {
+                "classification": "혐오",
+                "reason": f"KoELECTRA의 높은 확률로 인해 판단됨 (카테고리: {', '.join(detected)})",
+                "raw_llm_output": "[LLM 호출 생략됨]",
+                "koelectra_output": koelectra_context_str
+            }
+
         input_data = {
             config.RAG_CHAIN_INPUT_KEY: comment_text,
             config.KOELECTRA_CONTEXT_KEY: koelectra_context_str,
@@ -346,79 +359,74 @@ def analyze_comment(comment_text: str) -> Dict[str, Any]:
         }
 
 def analyze_comments_batch(comments: List[str], max_concurrency: int = 5) -> List[Dict[str, Any]]:
-    """
-    Analyzes a batch of comments, parallelizing LLM calls.
-    max_concurrency: Max concurrent requests to OpenAI. Adjust based on your rate limits.
-    """
     if not all([rag_chain, koelectra_model, chat_openai_model, vectorstore, embeddings_model]):
         logger.error("LLM Analyzer: One or more components not initialized. Cannot analyze batch.")
         error_reason = "분석기 초기화 실패. 필수 구성 요소 누락."
-        return [{
-            "classification": "오류", "reason": error_reason,
-            "raw_llm_output": "", "koelectra_output": ""
-        }] * len(comments)
+        return [dict(classification="오류", reason=error_reason, raw_llm_output="", koelectra_output="")] * len(comments)
 
     logger.info(f"Starting batch analysis for {len(comments)} comments with max_concurrency={max_concurrency}.")
 
-    # 1. Get KoELECTRA context for all comments (sequentially for now, can be parallelized if slow)
-    # If KoELECTRA becomes a bottleneck for large batches, this part can be parallelized
-    # using ThreadPoolExecutor similar to how rag_chain.batch works internally for LLM calls.
-    koelectra_outputs_map: Dict[str, str] = {}
+    bypass_threshold = config.KOELECTRA_BYPASS_THRESHOLD
+    label_names = ["출신차별", "외모차별", "정치성향차별", "욕설", "연령차별", "성차별", "인종차별", "종교차별"]
+
+    final_results: List[Optional[Dict[str, Any]]] = [None] * len(comments)
     rag_input_list: List[Dict[str, Any]] = []
+    rag_input_indices: List[int] = []
 
     for i, comment_text in enumerate(comments):
-        # It's good practice to provide some feedback for long-running batch jobs
-        if (i + 1) % 10 == 0 or (i + 1) == len(comments) :
-             logger.info(f"Processing KoELECTRA for comment {i+1}/{len(comments)}...")
-        koelectra_context_str, _ = get_koelectra_context(comment_text)
-        koelectra_outputs_map[comment_text] = koelectra_context_str
-        
-        include_koelectra = "[KoELECTRA 모델 로드 실패]" not in koelectra_context_str and \
-                            "판단 유보:" not in koelectra_context_str and \
-                            koelectra_context_str.strip() != ""
-        
-        rag_input_list.append({
-            config.RAG_CHAIN_INPUT_KEY: comment_text,
-            config.KOELECTRA_CONTEXT_KEY: koelectra_context_str,
-            config.INCLUDE_KOELECTRA_KEY: include_koelectra
-        })
-    
-    logger.info("KoELECTRA processing complete. Invoking RAG chain in batch...")
+        if (i + 1) % 10 == 0 or (i + 1) == len(comments):
+            logger.info(f"Processing KoELECTRA for comment {i+1}/{len(comments)}...")
 
-    # 2. Invoke RAG chain in batch
-    # ChatOpenAI (and many other LLM providers in LangChain) will handle parallel API calls
-    # when .batch() is used. The `max_concurrency` is passed via the config.
-    try:
-        # The `config` argument allows passing configurations like `max_concurrency`
-        # which some runnables (like ChatModel) can use.
-        raw_llm_outputs: List[str] = rag_chain.batch(
-            rag_input_list, 
-            config={"max_concurrency": max_concurrency}
-        )
-    except Exception as e:
-        logger.error(f"LLM Analyzer: Error during RAG chain batch execution: {e}", exc_info=True)
-        error_reason = f"RAG 배치 처리 중 오류 발생: {str(e)}"
-        return [{
-            "classification": "오류", "reason": error_reason,
-            "raw_llm_output": "", "koelectra_output": koelectra_outputs_map.get(comments[i], "")
-        } for i in range(len(comments))]
+        koelectra_context_str, preds = get_koelectra_context(comment_text)
+        max_prob = max(preds) if preds else 0
 
-    logger.info("RAG chain batch processing complete. Parsing results...")
-    
-    # 3. Parse results
-    batch_results: List[Dict[str, Any]] = []
-    for i, raw_output in enumerate(raw_llm_outputs):
-        original_comment = comments[i] # Assumes .batch() preserves order of inputs in outputs
-        classification, reason = parse_llm_output(raw_output)
-        
-        batch_results.append({
-            "original_comment": original_comment, # Helpful for mapping back
-            "classification": classification,
-            "reason": reason,
-            "raw_llm_output": raw_output,
-            "koelectra_output": koelectra_outputs_map.get(original_comment, "[KoELECTRA 정보 없음]")
-        })
-        logger.debug(f"Batch analyzed '{original_comment[:30]}...': Class='{classification}', Reason='{reason[:30]}...'")
+        # ✅ KoELECTRA 확신도 높을 경우 GPT 생략
+        if any(p >= bypass_threshold for p in preds):
+            active = [label for label, p_val in zip(label_names, preds) if p_val >= bypass_threshold]
+            final_results[i] = {
+                "original_comment": comment_text,
+                "classification": "혐오",
+                "reason": f"KoELECTRA 확률 {bypass_threshold} 이상으로 판단됨 (카테고리: {', '.join(active)})",
+                "raw_llm_output": "[LLM 호출 생략됨]",
+                "koelectra_output": koelectra_context_str
+            }
+        else:
+            # GPT 호출 필요 → rag_chain 입력으로 추가
+            include_koelectra = "[KoELECTRA 모델 로드 실패]" not in koelectra_context_str and \
+                                "판단 유보:" not in koelectra_context_str and \
+                                koelectra_context_str.strip() != ""
+            rag_input_list.append({
+                config.RAG_CHAIN_INPUT_KEY: comment_text,
+                config.KOELECTRA_CONTEXT_KEY: koelectra_context_str,
+                config.INCLUDE_KOELECTRA_KEY: include_koelectra
+            })
+            rag_input_indices.append(i)
+
+    # ✅ GPT 호출
+    if rag_input_list:
+        logger.info(f"Invoking RAG chain for {len(rag_input_list)} comments...")
+        try:
+            raw_llm_outputs = rag_chain.batch(rag_input_list, config={"max_concurrency": max_concurrency})
+            for idx, raw_output in enumerate(raw_llm_outputs):
+                orig_idx = rag_input_indices[idx]
+                classification, reason = parse_llm_output(raw_output)
+                final_results[orig_idx] = {
+                    "original_comment": comments[orig_idx],
+                    "classification": classification,
+                    "reason": reason,
+                    "raw_llm_output": raw_output,
+                    "koelectra_output": rag_input_list[idx][config.KOELECTRA_CONTEXT_KEY]
+                }
+        except Exception as e:
+            logger.error(f"LLM Analyzer: Error during RAG chain batch execution: {e}", exc_info=True)
+            for idx in rag_input_indices:
+                final_results[idx] = {
+                    "original_comment": comments[idx],
+                    "classification": "오류",
+                    "reason": f"RAG 분석 중 오류: {str(e)}",
+                    "raw_llm_output": "",
+                    "koelectra_output": "[KoELECTRA 결과 있음]"
+                }
 
     logger.info(f"Batch analysis finished for {len(comments)} comments.")
-    return batch_results
+    return final_results
