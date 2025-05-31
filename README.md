@@ -1,123 +1,132 @@
 # 🐶 HATEDOG: AI 기반 유튜브 댓글 혐오 표현 탐지기
 
-유튜브 댓글을 전송하면 **KoELECTRA + OpenAI GPT + LangChain + RAG**을 이용해  
-혐오 여부와 그 판단 근거를 함께 반환하는 API 서버입니다.  
-함께 제공되는 크롬 확장을 통해 유튜브 댓글을 실시간 수집하고 서버에 자동 분석 요청할 수 있습니다.
+YouTube 댓글을 전송하면 **KoELECTRA + OpenAI GPT + LangChain + FAISS RAG** 구조를 이용해  
+**혐오 여부 판단과 그 근거 생성**까지 자동으로 수행하는 API 서버입니다.
+
+크롬 확장을 함께 사용하면 유튜브 댓글을 실시간 분석할 수 있습니다.
 
 ---
 
-## 🚀 Colab에서 바로 실행하기
+## 🚀 Colab에서 바로 실행
 
 📎 [Colab에서 실행](https://colab.research.google.com/github/hatedogs/hatedog/blob/main/run.ipynb)
 
-> ✅ **이 프로젝트는 Colab 환경에서 테스트되고 개발되었습니다.**  
-> 로컬 환경 설정 없이 바로 실행해보기에 가장 간단한 방법입니다.
-
 > 이 노트북은 다음을 자동으로 수행합니다:
 > - GitHub 레포지토리 클론
-> - 필요한 라이브러리 설치
-> - ngrok 공개 주소 생성
+> - 의존 라이브러리 설치
 > - Flask 서버 실행
+> - ngrok 주소 자동 발급
 
-실행 전 아래와 같은 **환경변수 3개를 수동으로 입력**해야 합니다:
-
-```python
-import os
-os.environ["HF_TOKEN"] = "hf_..."         # Hugging Face 토큰
-os.environ["NGROK_AUTH_TOKEN"] = "2B..."  # ngrok 토큰
-os.environ["OPENAI_API_KEY"] = "sk-..."   # OpenAI API 키
-```
-
-### 🧠 서버 기능 요약
-
-✅ KoELECTRA 기반 멀티레이블 혐오 탐지 (8개 범주)
-
-✅ LangChain + OpenAI GPT를 통한 최종 이진 분류 및 근거 생성
-
-✅ FAISS 벡터스토어 기반 RAG 구조로 신조어 대응
-
-✅ 크롬 확장과 통합
-
-✅ Flask API로 /analyze, /report_word 제공
-
-### 📂 폴더 구조
-
-```bash
-hatedog/
-├── chrome-extension/       # 크롬 확장 코드
-├── llm_server/             # Flask 서버 및 분석 로직
-│   ├── app.py
-│   ├── config.py
-│   ├── llm_analyzer.py
-│   ├── db.py
-│   ├── data/
-│   │   └── mz_hate_speech.csv  # ✅ 기본 예시 포함 (수정 가능)
-│   └── ...
-└── run.ipynb               # Colab 실행 진입점
-```
-
-### 🔍 mz_hate_speech.csv: 신조어 기반 RAG 확장
-
-`llm_server/data/mz_hate_speech.csv`에는
-MZ세대 혐오 표현/정상 표현 예시가 담겨 있으며,
-초기 실행 시 자동으로 벡터스토어에 임베딩되어 RAG 기반 프롬프트에 활용됩니다.
-
-### CSV 포맷 예시:
-```csv
-범주,예시표현,간략 정의/맥락,label
-인종,화짱조,"화교, 짱깨, 조선족의 줄임말로, 중국계 사람에 대한 인종차별 표현",혐오 발언
-```
-
-✅ 이 파일은 기본으로 포함되어 있으며,
-
-📝 사용자가 직접 내용 추가/수정 후 재시작하면 탐지기의 인식 범위를 확장할 수 있습니다.
+실행 전 다음 환경변수를 수동으로 입력해야 합니다:
+- `HF_TOKEN`
+- `NGROK_AUTH_TOKEN`
+- `OPENAI_API_KEY`
 
 ---
 
-## 🌐 Chrome 확장 (📁 `chrome-extension/`)
+## 🧠 주요 기능 요약
 
-이 프로젝트에는 YouTube 댓글을 실시간으로 감지하여  
-**KoELECTRA + GPT 기반 서버에 전송하고 결과를 UI에 반영하는 크롬 확장**이 포함됩니다.
-
-### ⚙️ 주요 구성 요소
-
-| 파일 | 역할 |
+| 기능 | 설명 |
 |------|------|
-| `content_script.js` | 댓글을 감지하고 서버에 전송하며, UI를 '검열됨/정상'으로 표시 |
-| `background.js`     | YouTube `watch` 페이지를 감지하고 `content_script.js`를 자동으로 삽입 |
-| `manifest.json`     | 확장 프로그램 정의 (V3, 서비스 워커 기반) |
-| `icon.png`          | 확장 아이콘 |
+| ✅ 멀티레이블 KoELECTRA 혐오 탐지 | 인종, 젠더, 정치 등 8개 범주 |
+| ✅ GPT 기반 근거 생성 및 이진 판단 | LangChain 기반 프롬프트 |
+| ✅ FAISS 벡터스토어 + RAG 구조 | 신조어/인터넷 은어 대응 |
+| ✅ Chrome 확장 제공 | 실시간 댓글 분석, 신고 가능 |
+| ✅ **신고 누적 자동 정의 생성** | 신고 10회 시 LLM + RAG 업데이트 |
 
+---
 
-### 🔍 작동 방식
+## 📂 폴더 구조 (핵심)
 
-1. **YouTube `watch` 페이지에 접근하면 자동으로 감지**
-2. **댓글이 새로 로딩되면 자동으로 서버에 전송**
-3. **혐오 표현이면 "검열됨", 아니면 원문 유지**
-4. 각 댓글 옆 메뉴에 **느낌표 버튼**이 추가됨 → 직접 단어를 신고 가능
-
-### 🔐 서버와의 통신
-
-- 분석 요청: `POST /analyze`
-- 단어 신고: `POST /report_word`
-
-서버 주소(`SERVER_URL`)는 `content_script.js` 내 상단에서 수동 설정해야 합니다.
-
-```javascript
-const SERVER_URL = "https://your-ngrok-url.ngrok-free.app"; // 반드시 실제 ngrok 주소로 변경
-⚠️ Colab에서 ngrok로 서버 실행 시, 매번 새 주소가 생성되므로 SERVER_URL은 수시로 갱신 필요
+```bash
+llm_server/
+├── data/
+│   └── mz_hate_speech.csv     # CSV 기반 혐오/신조어 사전
+├── app.py                     # Flask 진입점
+├── config.py                  # 설정값 (CSV 경로, 벡터 저장 위치 등)
+├── db.py                      # 신고 수 카운터 + 기록 DB
+├── llm_analyzer.py            # GPT 모델 래퍼 + VectorDB
+├── vectorDB_update.py         # 전체 신고/정의/CSV/벡터 처리 로직
 ```
 
-### 🧪 설치 방법 (Chrome 확장)
+---
 
-1. Chrome 브라우저에서 `chrome://extensions` 접속
-2. 우측 상단 "개발자 모드" 활성화
-3. "압축해제된 확장 프로그램 로드" 클릭
+## 📌 자동 정의 생성 + 벡터 DB 업데이트
+
+### 🚨 신고 누적 → 자동 처리 파이프라인
+
+크롬 확장에서 사용자가 단어를 신고하면 Flask 서버는 이를 저장하고,  
+**신고 수가 10회 누적되면 아래 로직이 자동 실행됩니다:**
+
+1. `db.py`  
+   - `get_reason_list_for_word()`로 신고 사유 수집
+
+2. `llm_analyzer.py`  
+   - 사유 기반 프롬프트를 GPT로 호출하여 CSV 한 줄 생성
+
+3. `vectorDB_update.py`  
+   - `generate_csv_entry_from_report()`로 CSV 항목 구성  
+   - `append_to_csv()`로 `mz_hate_speech.csv`에 추가  
+   - `update_faiss_vectorstore()`로 FAISS 벡터스토어 동기화  
+   - `erase_db()`로 신고 DB 초기화
+
+➡️ **신조어도 신고 10회만 되면 자동 학습됩니다.**
+
+---
+
+## 🧠 `mz_hate_speech.csv` 구조
+
+```csv
+범주,예시표현,간략 정의/맥락,label
+인종,화짱조,"화교+짱깨+조선족 등 중국계 혐오 표현",혐오 발언
+```
+
+- 이 파일은 FAISS 벡터스토어의 소스로 사용되며,
+- 새 항목이 추가되면 vectorstore도 함께 동기화됩니다.
+
+---
+
+## 🌐 크롬 확장 (📁 `chrome-extension/`)
+
+### 기능 요약
+
+- 유튜브 댓글 로딩 감지 → `/analyze` 서버 요청
+- 결과에 따라 댓글을 "검열됨"/정상으로 표시
+- 각 댓글 옆에 `느낌표 버튼`이 나타나면 신고 가능
+- `/report_word`로 신고 서버 전송
+
+### 서버 주소 설정
+
+`chrome-extension/content_script.js` 내:
+
+```js
+const SERVER_URL = "https://your-ngrok-url.ngrok-free.app";
+```
+
+> Colab 사용 시 ngrok 주소는 매번 달라지므로 수시로 갱신 필요
+
+### 설치 방법
+
+1. Chrome → `chrome://extensions` 진입
+2. "개발자 모드" ON
+3. "압축 해제된 확장 프로그램 로드" 클릭
 4. `chrome-extension/` 폴더 선택
-5. YouTube 영상 페이지로 이동 → 댓글 분석이 자동으로 동작하는지 확인
 
-### 📎 예시 동작 화면
-댓글이 "검열됨"으로 바뀌거나
+---
 
-UI 오른쪽 메뉴에 노란색 느낌표 아이콘(신고 버튼)이 추가됩니다.
+## 📎 예시 동작 흐름
 
+1. `게임 ㅈㄴ 못하네`라는 댓글에 사용자가 느낌표 버튼 클릭  
+2. 서버는 `game_jot_na` 단어에 대해 신고 누적 수 증가  
+3. 누적 10회 도달 → GPT 호출 → `"게임","game_jot_na","욕설을 암시하는 줄임말",혐오 발언` 생성  
+4. `mz_hate_speech.csv`에 추가  
+5. FAISS 벡터스토어 자동 갱신  
+6. 다음부터는 같은 표현이 나올 때 **즉시 탐지 가능**
+
+---
+
+## 💡 추가 확장 아이디어
+
+- 신고자 그룹별 통계 수집
+- 관리자 승인 기반 정의 검수 모드
+- RAG에서 GPT 호출 대신 predefined category 템플릿 생성
