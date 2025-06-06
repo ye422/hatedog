@@ -316,11 +316,12 @@ def analyze_comment(comment_text: str) -> Dict[str, Any]:
 
     koelectra_context_str = "[KoELECTRA 분석 정보 없음]"
     try:
-        koelectra_context_str, _ = get_koelectra_context(comment_text)
-        include_koelectra = "[KoELECTRA 모델 로드 실패]" not in koelectra_context_str and \
-                            "판단 유보:" not in koelectra_context_str and \
-                            koelectra_context_str.strip() != ""
         koelectra_context_str, preds = get_koelectra_context(comment_text)
+        include_koelectra = (
+            "[KoELECTRA 모델 로드 실패]" not in koelectra_context_str
+            and "판단 유보:" not in koelectra_context_str
+            and koelectra_context_str.strip() != ""
+        )
         # threshold 기준: 확률 분포가 너무 높으면 KoELECTRA로만 판단
         if any(p >= config.KOELECTRA_BYPASS_THRESHOLD for p in preds):
             logger.info(
