@@ -323,9 +323,11 @@ def analyze_comment(comment_text: str) -> Dict[str, Any]:
         koelectra_context_str, preds = get_koelectra_context(comment_text)
         # threshold 기준: 확률 분포가 너무 높으면 KoELECTRA로만 판단
         if any(p >= config.KOELECTRA_BYPASS_THRESHOLD for p in preds):
-            logger.info(f"KoELECTRA 확률이 threshold 0.8 이상이므로 LLM 호출 생략: {preds}")
+            logger.info(
+                f"KoELECTRA 확률이 threshold {config.KOELECTRA_BYPASS_THRESHOLD} 이상이므로 LLM 호출 생략: {preds}"
+            )
             active_labels = ["출신차별", "외모차별", "정치성향차별", "욕설", "연령차별", "성차별", "인종차별", "종교차별"]
-            detected = [label for label, v in zip(active_labels, preds) if v >= 0.8]
+            detected = [label for label, v in zip(active_labels, preds) if v >= config.KOELECTRA_BYPASS_THRESHOLD]
             return {
                 "classification": "혐오",
                 "reason": f"KoELECTRA의 높은 확률로 인해 판단됨 (카테고리: {', '.join(detected)})",
