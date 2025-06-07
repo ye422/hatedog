@@ -130,3 +130,10 @@ const SERVER_URL = "https://your-ngrok-url.ngrok-free.app";
 - 신고자 그룹별 통계 수집
 - 관리자 승인 기반 정의 검수 모드
 - RAG에서 GPT 호출 대신 predefined category 템플릿 생성
+
+## 📊 사용한 데이터
+
+- **Unsmile**: [https://github.com/smilegate-ai/korean_unsmile_dataset]
+- **KMHAS (Korean Multi-label Hate Annotation Set)**: [https://huggingface.co/datasets/jeanlee/K-MHaS](https://huggingface.co/datasets/jeanlee/K-MHaS)
+- **신조어 사전 (`mz_hate_speech.csv`)**: 프로젝트 내 `llm_server/data/` 폴더에 포함됨
+
