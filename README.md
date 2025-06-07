@@ -137,5 +137,3 @@ const SERVER_URL = "https://your-ngrok-url.ngrok-free.app";
 
 - **Unsmile**: [https://github.com/smilegate-ai/korean_unsmile_dataset]
 - **KMHAS (Korean Multi-label Hate Annotation Set)**: [https://huggingface.co/datasets/jeanlee/K-MHaS](https://huggingface.co/datasets/jeanlee/K-MHaS)
-- **신조어 사전 (`mz_hate_speech.csv`)**: 프로젝트 내 `llm_server/data/` 폴더에 포함됨
-
