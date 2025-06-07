@@ -131,6 +131,8 @@ const SERVER_URL = "https://your-ngrok-url.ngrok-free.app";
 - 관리자 승인 기반 정의 검수 모드
 - RAG에서 GPT 호출 대신 predefined category 템플릿 생성
 
+---
+
 ## 📊 사용한 데이터
 
 - **Unsmile**: [https://github.com/smilegate-ai/korean_unsmile_dataset]
