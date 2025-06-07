@@ -136,4 +136,4 @@ const SERVER_URL = "https://your-ngrok-url.ngrok-free.app";
 ## 📊 사용한 데이터
 
 - **Unsmile**: [https://github.com/smilegate-ai/korean_unsmile_dataset]
-- **KMHAS (Korean Multi-label Hate Annotation Set)**: [https://huggingface.co/datasets/jeanlee/K-MHaS](https://huggingface.co/datasets/jeanlee/K-MHaS)
+- **KMHAS (Korean Multi-label Hate Annotation Set)**: [https://huggingface.co/datasets/jeanlee/K-MHaS]
