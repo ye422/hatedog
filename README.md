@@ -66,6 +66,36 @@
 
 - [Chrome Extension ZIP 다운로드](https://github.com/hatedogs/hatedog/releases/download/chrome-extension/chrome-extension.zip)
 
+---
+
+## 🌐 크롬 확장 (📁 `chrome-extension/`)
+
+### 기능 요약
+
+- 유튜브 댓글 로딩 감지 → `/analyze` 서버 요청
+- 결과에 따라 댓글을 "검열됨"/정상으로 표시
+- 각 댓글 옆에 `느낌표 버튼`이 나타나면 신고 가능
+- `/report_word`로 신고 서버 전송
+
+### 서버 주소 설정
+
+`chrome-extension/content_script.js` 내:
+
+```js
+const SERVER_URL = "https://your-ngrok-url.ngrok-free.app";
+```
+
+> Colab 사용 시 ngrok 주소는 매번 달라지므로 수시로 갱신 필요
+
+### 설치 방법
+
+1. Chrome → `chrome://extensions` 진입
+2. "개발자 모드" ON
+3. "압축 해제된 확장 프로그램 로드" 클릭
+4. `chrome-extension/` 폴더 선택
+
+---
+
 
 ## 🧠 주요 기능 요약
 
@@ -126,34 +156,6 @@ llm_server/
 
 - 이 파일은 FAISS 벡터스토어의 소스로 사용되며,
 - 새 항목이 추가되면 vectorstore도 함께 동기화됩니다.
-
----
-
-## 🌐 크롬 확장 (📁 `chrome-extension/`)
-
-### 기능 요약
-
-- 유튜브 댓글 로딩 감지 → `/analyze` 서버 요청
-- 결과에 따라 댓글을 "검열됨"/정상으로 표시
-- 각 댓글 옆에 `느낌표 버튼`이 나타나면 신고 가능
-- `/report_word`로 신고 서버 전송
-
-### 서버 주소 설정
-
-`chrome-extension/content_script.js` 내:
-
-```js
-const SERVER_URL = "https://your-ngrok-url.ngrok-free.app";
-```
-
-> Colab 사용 시 ngrok 주소는 매번 달라지므로 수시로 갱신 필요
-
-### 설치 방법
-
-1. Chrome → `chrome://extensions` 진입
-2. "개발자 모드" ON
-3. "압축 해제된 확장 프로그램 로드" 클릭
-4. `chrome-extension/` 폴더 선택
 
 ---
 
