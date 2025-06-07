@@ -40,6 +40,11 @@
 
 ---
 
+## 🎬 실행 데모 영상
+
+아래 영상을 통해 Colab에서 서버를 실행하고 Chrome 확장을 연동하는 방법을 확인할 수 있습니다:  
+📺 [YouTube에서 보기](https://www.youtube.com/watch?v=T04p52aCoCc)
+
 ## 🚀 Colab에서 바로 실행
 
 📎 [Colab에서 실행](https://colab.research.google.com/github/hatedogs/hatedog/blob/main/run.ipynb)
