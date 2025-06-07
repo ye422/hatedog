@@ -136,4 +136,4 @@ const SERVER_URL = "https://your-ngrok-url.ngrok-free.app";
 ## 📄 논문 
 
 본 프로젝트에 대한 자세한 내용은 아래 논문에서 확인할 수 있습니다:  
-👉 [KCC 2025 제출 논문 PDF 다운로드](https://github.com/js22211/your-repo-name/releases/download/paper/KCC_2025_paper.pdf)
+👉 [KCC 2025 제출 논문 PDF 다운로드](https://github.com/hatedogs/hatedog/releases/download/paper/KCC_2025_paper.pdf)
