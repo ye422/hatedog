@@ -125,15 +125,15 @@ const SERVER_URL = "https://your-ngrok-url.ngrok-free.app";
 
 ---
 
-## 💡 추가 확장 아이디어
-
-- 신고자 그룹별 통계 수집
-- 관리자 승인 기반 정의 검수 모드
-- RAG에서 GPT 호출 대신 predefined category 템플릿 생성
-
----
 
 ## 📊 사용한 데이터
 
 - **Unsmile**: [https://github.com/smilegate-ai/korean_unsmile_dataset]
 - **KMHAS (Korean Multi-label Hate Annotation Set)**: [https://huggingface.co/datasets/jeanlee/K-MHaS]
+
+---
+
+## 📄 논문 
+
+본 프로젝트에 대한 자세한 내용은 아래 논문에서 확인할 수 있습니다:  
+👉 [KCC 2025 제출 논문 PDF 다운로드](https://github.com/js22211/your-repo-name/releases/download/paper/KCC_2025_paper.pdf)
