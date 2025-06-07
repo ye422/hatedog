@@ -65,6 +65,7 @@
 ## 📦 크롬 확장 다운로드 
 
 - [Chrome Extension ZIP 다운로드](https://github.com/hatedogs/hatedog/releases/download/chrome-extension/chrome-extension.zip)
+  
 
 ## 🌐 크롬 확장 (📁 `chrome-extension/`)
 
