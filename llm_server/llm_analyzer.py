@@ -67,7 +67,7 @@ def load_koelectra_components():
         logger.error(f"Error loading KoELECTRA components: {e}", exc_info=True)
         return False
 
-def get_koelectra_context(text: str) -> Tuple[str, List[int]]:
+def get_koelectra_context(text: str) -> Tuple[str, List[float]]:
     if koelectra_model is None or koelectra_tokenizer is None:
         logger.warning("KoELECTRA model or tokenizer not loaded. Returning failure message.")
         return "[KoELECTRA 모델 로드 실패]", []
@@ -95,7 +95,7 @@ def get_koelectra_context(text: str) -> Tuple[str, List[int]]:
         lines.append(f"혐오 탐지됨! 속성: {', '.join(active)}")
     
     context_str = "\n".join(lines)
-    return context_str, preds.tolist()
+    return context_str, probs.tolist()
 
 # --- Prompt Templates ---
 COMMON_PREFIX = """당신은 입력된 한국어 문장이 '혐오' 표현인지 '정상'적인 내용인지 분류하는 전문가입니다.
@@ -316,19 +316,20 @@ def analyze_comment(comment_text: str) -> Dict[str, Any]:
 
     koelectra_context_str = "[KoELECTRA 분석 정보 없음]"
     try:
-        koelectra_context_str, preds = get_koelectra_context(comment_text)
+        koelectra_context_str, probs = get_koelectra_context(comment_text)
         include_koelectra = (
             "[KoELECTRA 모델 로드 실패]" not in koelectra_context_str
             and "판단 유보:" not in koelectra_context_str
             and koelectra_context_str.strip() != ""
         )
         # threshold 기준: 확률 분포가 너무 높으면 KoELECTRA로만 판단
-        if any(p >= config.KOELECTRA_BYPASS_THRESHOLD for p in preds):
-            logger.info(
-                f"KoELECTRA 확률이 threshold {config.KOELECTRA_BYPASS_THRESHOLD} 이상이므로 LLM 호출 생략: {preds}"
+        if any(p >= config.KOELECTRA_BYPASS_THRESHOLD for p in probs):
+
+            print(
+                f"KoELECTRA 확률이 threshold {config.KOELECTRA_BYPASS_THRESHOLD} 이상이므로 LLM 호출 생략: {probs}"
             )
             active_labels = ["출신차별", "외모차별", "정치성향차별", "욕설", "연령차별", "성차별", "인종차별", "종교차별"]
-            detected = [label for label, v in zip(active_labels, preds) if v >= config.KOELECTRA_BYPASS_THRESHOLD]
+            detected = [label for label, v in zip(active_labels, probs) if v >= config.KOELECTRA_BYPASS_THRESHOLD]
             return {
                 "classification": "혐오",
                 "reason": f"KoELECTRA의 높은 확률로 인해 판단됨 (카테고리: {', '.join(detected)})",
@@ -380,12 +381,12 @@ def analyze_comments_batch(comments: List[str], max_concurrency: int = 5) -> Lis
         if (i + 1) % 10 == 0 or (i + 1) == len(comments):
             logger.info(f"Processing KoELECTRA for comment {i+1}/{len(comments)}...")
 
-        koelectra_context_str, preds = get_koelectra_context(comment_text)
-        max_prob = max(preds) if preds else 0
+        koelectra_context_str, probs = get_koelectra_context(comment_text)
+        max_prob = max(probs) if probs else 0
 
         # ✅ KoELECTRA 확신도 높을 경우 GPT 생략
-        if any(p >= bypass_threshold for p in preds):
-            active = [label for label, p_val in zip(label_names, preds) if p_val >= bypass_threshold]
+        if any(p >= bypass_threshold for p in probs):
+            active = [label for label, p_val in zip(label_names, probs) if p_val >= bypass_threshold]
             final_results[i] = {
                 "original_comment": comment_text,
                 "classification": "혐오",
