@@ -325,7 +325,7 @@ def analyze_comment(comment_text: str) -> Dict[str, Any]:
         # threshold 기준: 확률 분포가 너무 높으면 KoELECTRA로만 판단
         if any(p >= config.KOELECTRA_BYPASS_THRESHOLD for p in probs):
 
-            print(
+            logger.info(
                 f"KoELECTRA 확률이 threshold {config.KOELECTRA_BYPASS_THRESHOLD} 이상이므로 LLM 호출 생략: {probs}"
             )
             active_labels = ["출신차별", "외모차별", "정치성향차별", "욕설", "연령차별", "성차별", "인종차별", "종교차별"]
