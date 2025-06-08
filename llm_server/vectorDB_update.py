@@ -15,9 +15,9 @@ logger = logging.getLogger(__name__)
 
 def generate_csv_entry_from_report(word: str, reasons: List[str]) -> Optional[Dict[str, str]]:
     """
-    GPT-4.1을 사용하여 신고된 단어와 사유들을 기반으로 CSV에 추가할 새로운 항목을 생성합니다.
+    GPT-4.1 api를  사용하여 신고된 단어와 사유들을 기반으로 CSV에 추가할 새로운 항목을 생성합니다.
     """
-    # 고정된 GPT-4.1 모델 사용 (llm_analyzer와 독립)
+    #GPT-4.1 모델 사용 (llm_analyzer와 독립)
     try:
         definition_gen_model = ChatOpenAI(model="gpt-4.1", temperature=0.3)
     except Exception as e:
