@@ -90,7 +90,7 @@ def get_koelectra_context(text: str) -> Tuple[str, List[int]]:
 
     active = [label for label, p_val in zip(label_names, preds) if p_val]
     if not active:
-        lines.append("판단 유보: 어떤 혐오 카테고리도 threshold(0.4)를 넘지 않음.")
+        lines.append("판단 유보: 어떤 혐오 카테고리도 threshold를 넘지 않음.")
     else:
         lines.append(f"혐오 탐지됨! 속성: {', '.join(active)}")
     
