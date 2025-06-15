@@ -58,11 +58,17 @@ CSV 형식의 데이터를 한 줄 생성해주세요.
         generated_csv_line = generated_csv_line.strip()
         logger.info(f"응답 (단어: {word}): {generated_csv_line}")
 
-        parts = [p.strip().replace('"', '') for p in generated_csv_line.split(',')]
-        if len(parts) == 3:
-            category, expression, definition = parts
+        # --- 여기를 수정합니다 ---
+        # maxsplit=2를 사용하여 처음 두 개의 콤마에서만 분리합니다.
+        parts = generated_csv_line.split(',', 2)
+
+        # 각 부분의 앞뒤 공백과 따옴표를 제거합니다.
+        cleaned_parts = [p.strip().replace('"', '') for p in parts]
+
+        if len(cleaned_parts) == 3:
+            category, expression, definition = cleaned_parts
             if expression != word:
-                logger.warning(f"예시표현이 원본 단어와 다름: {expression} → {word}로 변경")
+                logger.warning(f"예시표현이 원본 단어와 다름: '{expression}' → '{word}'로 변경")
                 expression = word
             return {
                 "범주": category,
@@ -70,11 +76,12 @@ CSV 형식의 데이터를 한 줄 생성해주세요.
                 "간략 정의/맥락": definition
             }
         else:
-            logger.error(f"응답 파싱 실패: {generated_csv_line}")
+            # 에러 로그에 parts 내용을 포함하여 디버깅에 용이하게 만듭니다.
+            logger.error(f"응답 파싱 실패. 예상 필드 수(3)와 다름({len(cleaned_parts)}). 응답: '{generated_csv_line}'")
             return None
-        
+
     except Exception as e:
-        logger.error(f"호출 오류 (단어: {word})", exc_info=True)
+        logger.error(f"LLM 호출 또는 파싱 중 오류 (단어: {word})", exc_info=True)
         return None
     
 def append_to_csv(new_entry: Dict[str, str], csv_filepath: str) -> bool:
