@@ -99,11 +99,11 @@ def analyze_comment_endpoint():
             })
             continue
 
-        app.logger.info(f"댓글 분석 중 (ID: {comment_id}, 텍스트 일부: {comment_text[:50]}...)")
+        #app.logger.info(f"댓글 분석 중 (ID: {comment_id}, 텍스트 일부: {comment_text[:50]}...)")
         try:
             # 각 댓글을 llm_analyzer로 개별 분석
             analysis_result = llm_analyzer.analyze_comment(comment_text)
-            app.logger.info(f"ID {comment_id} 분석 결과: {analysis_result}")
+            #app.logger.info(f"ID {comment_id} 분석 결과: {analysis_result}")
 
             is_hateful = analysis_result.get("classification", "불명확") == "혐오"
             
@@ -138,9 +138,12 @@ def analyze_comment_endpoint():
         end_time = time.time()
         processing_time = end_time - start_time
         total_processing_time += processing_time
-        app.logger.info(f"ID {comment_id} 처리 시간: {processing_time:.2f}초")
+        # ✅ 깔끔한 로그 출력
+        app.logger.info(f'\n[분석 결과] 댓글: "{comment_text[:50]}{"..." if len(comment_text) > 50 else ""}"')
+        app.logger.info(f'- 판단 사유: {analysis_result.get("reason", "파싱 실패")}')
+        app.logger.info(f'- 처리 시간: {processing_time:.2f}초')
 
-    app.logger.info(f"총 {len(comments_to_analyze)}개 댓글 처리 완료. 총 소요 시간: {total_processing_time:.2f}초")
+    app.logger.info(f"\n총 {len(comments_to_analyze)}개 댓글 처리 완료. 총 소요 시간: {total_processing_time:.2f}초")
     
     # 클라이언트가 기대하는 { "comments": [...] } 형식으로 최종 응답 구성
     response = jsonify({"comments": processed_results})
@@ -167,7 +170,7 @@ def report_word():
         app.logger.info(f"단어 '{word}'의 현재 신고 횟수: {report_count}")
 
         # 신고 횟수가 10회 이상일 때 처리 로직 실행 (config.py 등에서 임계값 관리 권장)
-        REPORT_THRESHOLD = 10 
+        REPORT_THRESHOLD = 1 
         if report_count >= REPORT_THRESHOLD:
             app.logger.info(f"단어 '{word}' 신고 {REPORT_THRESHOLD}회 도달. 자동 처리 시작.")
             
