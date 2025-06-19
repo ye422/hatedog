@@ -9,7 +9,7 @@ load_dotenv() # .env 파일에서 환경 변수 로드
 
 # --- OpenAI API Configuration ---
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-OPENAI_MODEL_NAME = "gpt-4.1-mini"
+OPENAI_MODEL_NAME = "gpt-4.1"
 
 # --- Hugging Face API Configuration ---
 HF_TOKEN = os.getenv('HF_TOKEN')
