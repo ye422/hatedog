@@ -24,7 +24,7 @@ def generate_csv_entry_from_report(word: str, reasons: List[str]) -> Optional[Di
         logger.error("모델 초기화 실패", exc_info=True)
         return None
 
-    known_categories = ["정치", "게임", "젠더", "인종", "기타 (계층/직업)", "기타 (일반)"]
+    known_categories = ["정치", "게임", "젠더", "인종", "기타"]
     reasons_str = "\n- ".join(reasons)
 
     prompt_str = f"""다음은 사용자들이 '{word}' 단어에 대해 신고한 내용과 그 사유들입니다.
