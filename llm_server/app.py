@@ -138,10 +138,11 @@ def analyze_comment_endpoint():
         end_time = time.time()
         processing_time = end_time - start_time
         total_processing_time += processing_time
-        # ✅ 깔끔한 로그 출력
-        app.logger.info(f'\n[분석 결과] 댓글: "{comment_text[:50]}{"..." if len(comment_text) > 50 else ""}"')
-        app.logger.info(f'- 판단 사유: {analysis_result.get("reason", "파싱 실패")}')
-        app.logger.info(f'- 처리 시간: {processing_time:.2f}초')
+        # ✅ 깔끔한 로그 출력 (이모지 포함)
+        print("\n📝 [분석 결과]")
+        print(f'💬 댓글: "{comment_text[:50]}{"..." if len(comment_text) > 50 else ""}"')
+        print(f'🧠 판단 사유: {analysis_result.get("reason", "❌ 파싱 실패")}')
+        print(f'⏱️ 처리 시간: {processing_time:.2f}초')
 
     app.logger.info(f"\n총 {len(comments_to_analyze)}개 댓글 처리 완료. 총 소요 시간: {total_processing_time:.2f}초")
     
